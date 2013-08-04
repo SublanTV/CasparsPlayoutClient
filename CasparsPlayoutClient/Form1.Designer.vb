@@ -24,7 +24,7 @@ Partial Class Form1
     Private Sub InitializeComponent()
         Me.Button1 = New System.Windows.Forms.Button()
         Me.Button2 = New System.Windows.Forms.Button()
-        Me.lstFrame = New System.Windows.Forms.ListBox()
+        Me.txtListenerCount = New System.Windows.Forms.TextBox()
         Me.SuspendLayout()
         '
         'Button1
@@ -45,29 +45,30 @@ Partial Class Form1
         Me.Button2.Text = "Send command"
         Me.Button2.UseVisualStyleBackColor = True
         '
-        'lstFrame
+        'txtListenerCount
         '
-        Me.lstFrame.FormattingEnabled = True
-        Me.lstFrame.Location = New System.Drawing.Point(152, 12)
-        Me.lstFrame.Name = "lstFrame"
-        Me.lstFrame.Size = New System.Drawing.Size(120, 134)
-        Me.lstFrame.TabIndex = 2
+        Me.txtListenerCount.Location = New System.Drawing.Point(152, 15)
+        Me.txtListenerCount.Name = "txtListenerCount"
+        Me.txtListenerCount.Size = New System.Drawing.Size(126, 20)
+        Me.txtListenerCount.TabIndex = 2
+        Me.txtListenerCount.Text = "1"
         '
         'Form1
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
-        Me.ClientSize = New System.Drawing.Size(284, 262)
-        Me.Controls.Add(Me.lstFrame)
+        Me.ClientSize = New System.Drawing.Size(285, 167)
+        Me.Controls.Add(Me.txtListenerCount)
         Me.Controls.Add(Me.Button2)
         Me.Controls.Add(Me.Button1)
         Me.Name = "Form1"
         Me.Text = "Form1"
         Me.ResumeLayout(False)
+        Me.PerformLayout()
 
     End Sub
     Friend WithEvents Button1 As System.Windows.Forms.Button
     Friend WithEvents Button2 As System.Windows.Forms.Button
-    Friend WithEvents lstFrame As System.Windows.Forms.ListBox
+    Friend WithEvents txtListenerCount As System.Windows.Forms.TextBox
 
 End Class

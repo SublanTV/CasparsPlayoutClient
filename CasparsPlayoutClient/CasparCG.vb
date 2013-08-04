@@ -1,19 +1,25 @@
 ﻿Imports System.Net
 Imports System.Net.Sockets
+Imports System.Threading
 
 Public Class CasparCGConnection
+    Private connectionLock As Semaphore
     Private serveraddress As String = "localhost"
     Private serverport As Integer = 5250 ' std. acmp2 port
     Private client As TcpClient
     Private reconnectTries = 10
     Private connectionAttemp = 0
     Private reconnectTimeout = 1000 ' 1sec
+    Private buffersize As Integer = 1024 * 256
     Private tryConnect As Boolean = True
 
     Public Sub New(ByVal serverAddress As String, ByVal serverPort As Integer)
+        connectionLock = New Semaphore(1, 1)
         Me.serveraddress = serverAddress
         Me.serverport = serverPort
         client = New TcpClient()
+        client.SendBufferSize = buffersize
+        client.ReceiveBufferSize = buffersize
         client.NoDelay = True
     End Sub
 
@@ -27,24 +33,24 @@ Public Class CasparCGConnection
                 client.NoDelay = True
                 If client.Connected Then
                     connectionAttemp = 0
-                    logger.log("Connected to " & serveraddress & ":" & serverport.ToString)
+                    logger.log("CasparCGConnection.connect: Connected to " & serveraddress & ":" & serverport.ToString)
                     Return True
                 End If
             Catch e As Exception
                 logger.warn(e.Message)
                 If connectionAttemp < reconnectTries Then
                     connectionAttemp = connectionAttemp + 1
-                    logger.warn("Try to reconnect " & connectionAttemp & "/" & reconnectTries)
+                    logger.warn("CasparCGConnection.connect: Try to reconnect " & connectionAttemp & "/" & reconnectTries)
                     Dim i As Integer = 0
                     Threading.Thread.Sleep(reconnectTimeout)
                     Return connect()
                 Else
-                    logger.err("Could not connect to " & serveraddress & ":" & serverport.ToString)
+                    logger.err("CasparCGConnection.connect: Could not connect to " & serveraddress & ":" & serverport.ToString)
                     Return False
                 End If
             End Try
         Else
-            logger.log("Allready connected to " & serveraddress & ":" & serverport.ToString)
+            logger.log("CasparCGConnection.connect: Allready connected to " & serveraddress & ":" & serverport.ToString)
         End If
         Return client.Connected
     End Function
@@ -92,10 +98,12 @@ Public Class CasparCGConnection
     ''' <remarks></remarks>
     Public Sub sendAsyncCommand(ByVal cmd As String)
         If connected(tryConnect) Then
-            logger.debug("Send command: " & cmd)
+            connectionLock.WaitOne()
+            logger.debug("CasparCGConnection.sendAsyncCommand: Send command: " & cmd)
             client.GetStream.Write(System.Text.UTF8Encoding.UTF8.GetBytes(cmd & vbCrLf), 0, cmd.Length + 2)
-            logger.debug("Command sent")
-        Else : logger.err("Not connected to server. Can't send command.")
+            logger.debug("CasparCGConnection.sendAsyncCommand: Command sent")
+            connectionLock.Release()
+        Else : logger.err("CasparCGConnection.sendAsyncCommand: Not connected to server. Can't send command.")
         End If
     End Sub
 
@@ -107,30 +115,44 @@ Public Class CasparCGConnection
     ''' <param name="cmd"></param>
     Public Function sendCommand(ByVal cmd As String) As CasparCGResponse
         If connected(tryConnect) Then
+            connectionLock.WaitOne()
             Dim isOk As Boolean = False
             Dim buffer() As Byte
+
             If client.Available > 0 Then
                 ReDim buffer(client.Available)
                 ' den alten Buffer erstmal auslesen, ihn brauchen wir nicht
                 client.GetStream.Read(buffer, 0, client.Available)
             End If
             ' Befehl senden
-            logger.debug("Send command: " & cmd)
+            logger.debug("CasparCGConnection.sendCommand: Send command: " & cmd)
             client.GetStream.Write(System.Text.UTF8Encoding.UTF8.GetBytes(cmd & vbCrLf), 0, cmd.Length + 2)
-            logger.debug("Command sent")
+            Dim timer As New Stopwatch
+            timer.Start()
+            'logger.debug("Command sent")
 
             ' Auf antwort warten
-            Dim i As Integer = 0
-            While client.Available < 3
-                Threading.Thread.Sleep(1)
-                i = i + 1
-            End While
-            logger.debug("Waited " & i & "ms for an answer")
-            ReDim buffer(client.Available)
-            client.GetStream.Read(buffer, 0, client.Available)
-            Return New CasparCGResponse(Trim(System.Text.UTF8Encoding.UTF8.GetString(buffer)))
+            Dim readComplete As Boolean = False
+            Dim readByte As Byte
+            Dim input As String = ""
+            Dim size As Integer = 0
+
+            Do Until (input.Trim().Length > 3) AndAlso (((input.Trim().Substring(0, 3) = "201" OrElse input.Trim().Substring(0, 3) = "200") AndAlso input.EndsWith(vbLf & vbCrLf)) OrElse (input.Trim().Substring(0, 3) <> "201" AndAlso input.Trim().Substring(0, 3) <> "200" AndAlso input.EndsWith(vbCrLf)))
+                readByte = client.GetStream.ReadByte()
+                If readByte > 0 Then
+                    ' Ein Zeichen gelesen
+                    input = input & ChrW(readByte)
+                Else
+                    Threading.Thread.Sleep(1)
+                End If
+            Loop
+
+            timer.Stop()
+            logger.debug("CasparCGConnection.sendCommand: Waited " & timer.ElapsedMilliseconds & "ms for an answer and received " & input.Length & " Bytes to read.")
+            connectionLock.Release()
+            Return New CasparCGResponse(input, cmd)
         Else
-            logger.err("Not connected to server. Can't send command.")
+            logger.err("CasparCGConnection.sendCommand: Not connected to server. Can't send command.")
             Return Nothing
         End If
     End Function
@@ -139,8 +161,8 @@ End Class
 
 Public Class CasparCGCommandFactory
 
-    Public Shared Function getLoadbg(ByVal channel As Integer, ByVal layer As Integer, ByVal media As String, Optional ByVal looping As Boolean = False, Optional ByVal seek As Long = 0, Optional ByVal length As Long = 0, Optional ByVal transition As CasparCGTransition = Nothing, Optional ByVal filter As String = "") As String
-        Dim cmd As String = "LOADBG " & getDestination(channel, layer) & " " & media
+    Public Shared Function getLoadbg(ByVal channel As Integer, ByVal layer As Integer, ByVal media As String, Optional ByRef autostarting As Boolean = False, Optional ByVal looping As Boolean = False, Optional ByVal seek As Long = 0, Optional ByVal length As Long = 0, Optional ByVal transition As CasparCGTransition = Nothing, Optional ByVal filter As String = "") As String
+        Dim cmd As String = "LOADBG " & getDestination(channel, layer) & " '" & media & "'"
 
         If looping Then
             cmd = cmd & " LOOP"
@@ -154,6 +176,9 @@ Public Class CasparCGCommandFactory
         If length > 0 Then
             cmd = cmd & " LENGTH " & length
         End If
+        If autostarting Then
+            cmd = cmd & " AUTO"
+        End If
         If filter.Length > 0 Then
             cmd = cmd & " FILTER " & filter
         End If
@@ -162,7 +187,7 @@ Public Class CasparCGCommandFactory
     End Function
 
     Public Shared Function getLoad(ByVal channel As Integer, ByVal layer As Integer, ByVal media As String, Optional ByVal looping As Boolean = False, Optional ByVal seek As Long = 0, Optional ByVal length As Long = 0, Optional ByVal transition As CasparCGTransition = Nothing, Optional ByVal filter As String = "") As String
-        Dim cmd As String = "LOAD " & getDestination(channel, layer) & " " & media
+        Dim cmd As String = "LOAD " & getDestination(channel, layer) & " '" & media & "'"
 
         If looping Then
             cmd = cmd & " LOOP"
@@ -187,7 +212,7 @@ Public Class CasparCGCommandFactory
         Dim cmd As String = "PLAY " & getDestination(channel, layer)
 
         If media.Length > 0 Then
-            cmd = cmd & " " & media
+            cmd = cmd & " '" & media & "'"
         End If
         If looping Then
             cmd = cmd & " LOOP"
@@ -206,6 +231,14 @@ Public Class CasparCGCommandFactory
         End If
 
         Return escape(cmd)
+    End Function
+
+    Public Shared Function getPlay(ByVal channel As Integer, ByVal layer As Integer, ByVal media As CasparCGMedia, Optional ByVal looping As Boolean = False, Optional ByVal seek As Long = 0, Optional ByVal length As Long = 0, Optional ByVal transition As CasparCGTransition = Nothing, Optional ByVal filter As String = "") As String
+        If IsNothing(media) Then
+            Return getPlay(channel, layer, , looping, seek, length, transition, filter)
+        Else
+            Return getPlay(channel, layer, media.getFullName, looping, seek, length, transition, filter)
+        End If
     End Function
 
     Public Shared Function getCall(ByVal channel As Integer, ByVal layer As Integer, Optional ByVal looping As Boolean = False, Optional ByVal seek As Long = 0, Optional ByVal length As Long = 0, Optional ByVal transition As CasparCGTransition = Nothing, Optional ByVal filter As String = "") As String
@@ -249,7 +282,7 @@ Public Class CasparCGCommandFactory
     Public Shared Function getClear(Optional ByVal channel As Integer = -1, Optional ByVal layer As Integer = -1) As String
         Dim cmd As String = "CLEAR"
         If channel > -1 Then
-            cmd = cmd & getDestination(channel, layer)
+            cmd = cmd & " " & getDestination(channel, layer)
         End If
         Return cmd
     End Function
@@ -357,6 +390,8 @@ End Class
 
 Public Class CasparCGResponse
 
+    Private cmd As String
+    Private serverMessage As String
     Private returncode As CasparReturnCode
     Private command As String
     Private data As String
@@ -379,25 +414,21 @@ Public Class CasparCGResponse
         ERR_FILE_UNREADABLE = 502 ' 502 [command] FAILED	- Media file unreadable 
     End Enum
 
-    Public Sub New(ByVal returnmessage As String)
-        Me.returncode = parseReturnCode(returnmessage)
-        Me.command = parseReturnCommand(returnmessage)
-        Me.data = parseReturnData(returnmessage)
+    Public Sub New(ByVal serverMessage As String, ByVal cmd As String)
+        'logger.log(cmd)
+        Me.cmd = cmd
+        Me.serverMessage = serverMessage
+        Me.returncode = parseReturnCode(serverMessage)
+        Me.command = parseReturnCommand(serverMessage)
+        Me.data = parseReturnData(serverMessage)
         Me.xml = parseXml(data)
     End Sub
 
-    Public Sub New(ByVal returnCode As CasparReturnCode, ByVal command As String, ByVal data As String)
-        Me.returncode = returnCode
-        Me.command = command
-        Me.data = data
-        Me.xml = parseXml(xml)
-    End Sub
-
-    Public Shared Function parseReturnCode(ByVal returnmessage As String) As CasparReturnCode
-        If Not IsNothing(returnmessage) Then
-            returnmessage = Trim(returnmessage)
-            If returnmessage.Length > 2 AndAlso IsNumeric(returnmessage.Substring(0, 3)) Then
-                Dim returncode As Integer = Integer.Parse(returnmessage.Substring(0, 3))
+    Public Shared Function parseReturnCode(ByVal serverMessage As String) As CasparReturnCode
+        If Not IsNothing(serverMessage) Then
+            serverMessage = Trim(serverMessage)
+            If serverMessage.Length > 2 AndAlso IsNumeric(serverMessage.Substring(0, 3)) Then
+                Dim returncode As Integer = Integer.Parse(serverMessage.Substring(0, 3))
                 If [Enum].IsDefined(GetType(CasparReturnCode), returncode) Then
                     Return returncode
                 End If
@@ -406,33 +437,33 @@ Public Class CasparCGResponse
         Return 0
     End Function
 
-    Public Shared Function parseReturnCommand(ByVal returnmessage As String) As String
-        If Not IsNothing(returnmessage) AndAlso returnmessage.Length > 0 Then
-            returnmessage = Trim(returnmessage).Substring(4) ' Code wegschneiden
-            Return returnmessage.Substring(0, returnmessage.IndexOf(" "))
+    Public Shared Function parseReturnCommand(ByVal serverMessage As String) As String
+        If Not IsNothing(serverMessage) AndAlso serverMessage.Length > 3 Then
+            serverMessage = serverMessage.Trim().Substring(4) ' Code wegschneiden
+            Return serverMessage.Substring(0, serverMessage.IndexOf(" "))
         End If
         Return ""
     End Function
 
-    Public Shared Function parseReturnData(ByVal returnmessage As String) As String
-        If Not IsNothing(returnmessage) AndAlso returnmessage.Length > 0 Then
-            returnmessage.Substring(returnmessage.IndexOf(vbCr) + 1)
+    Public Shared Function parseReturnData(ByVal serverMessage As String) As String
+        If Not IsNothing(serverMessage) AndAlso serverMessage.Length > 0 Then
+            serverMessage.Substring(serverMessage.IndexOf(vbCr) + 1)
             ' Leerzeilen am ende entfernen
-            Dim lines() = returnmessage.Split(vbCrLf)
-            returnmessage = ""
+            Dim lines() = serverMessage.Split(vbCrLf)
+            serverMessage = ""
             If lines.Length > 1 Then
                 For i = 1 To lines.Length - 1
                     lines(i) = lines(i).Replace("vbcr", "").Replace(vbLf, "").Trim(vbVerticalTab).Trim(vbTab).Trim(vbNullChar).Trim(vbNewLine)
                     If lines(i).Length > 0 Then
                         If i = 1 Then
-                            returnmessage = lines(i)
+                            serverMessage = lines(i)
                         Else
-                            returnmessage = returnmessage & vbNewLine & lines(i)
+                            serverMessage = serverMessage & vbNewLine & lines(i)
                         End If
                     End If
                 Next
             End If
-            Return returnmessage
+            Return serverMessage
         End If
         Return ""
     End Function
@@ -464,6 +495,10 @@ Public Class CasparCGResponse
     End Function
 
     Public Function getCommand() As String
+        Return cmd
+    End Function
+
+    Public Function getReturnedCommand() As String
         Return command
     End Function
 
@@ -473,6 +508,10 @@ Public Class CasparCGResponse
 
     Public Function getXMLData() As String
         Return Xml
+    End Function
+
+    Public Function getServerMessage() As String
+        Return serverMessage
     End Function
 
 
@@ -565,7 +604,7 @@ Public MustInherit Class CasparCGMedia
         If configDoc.hasChildNodes Then
             '' Add all mediaInformation found by INFO
             For Each info As MSXML2.IXMLDOMNode In configDoc.firstChild.childNodes
-                addInfo(info.nodeName, info.nodeTypedValue)
+                setInfo(info.nodeName, info.nodeTypedValue)
             Next
         End If
     End Sub
@@ -597,10 +636,28 @@ Public MustInherit Class CasparCGMedia
         Return Infos.ContainsKey(info)
     End Function
 
+    Public Sub setInfo(ByVal info As String, ByVal value As String)
+        If Infos.ContainsKey(info) Then
+            Infos.Item(info) = value
+        Else
+            Infos.Add(info, value)
+        End If
+    End Sub
+
     Public Sub addInfo(ByVal info As String, ByVal value As String)
         Infos.Add(info, value)
     End Sub
 
+    Public Overrides Function toString() As String
+        Dim out As String = getFullName() & " (" & getMediaType.ToString & ")"
+        If getInfos.Count > 0 Then
+            out = out & vbNewLine & "INFOS:"
+            For Each infoKey As String In getInfos().Keys
+                out = out & vbNewLine & vbTab & infoKey & " = " & getInfo(infoKey)
+            Next
+        End If
+        Return out
+    End Function
 End Class
 
 Public Class CasparCGColor
@@ -1056,7 +1113,7 @@ Public Class CasparCGTransition
     End Sub
 
     Public Overloads Function toString() As String
-        Return Transitions.GetName(GetType(Transitions), trans) & " " & duration & " " & Directions.GetName(GetType(Directions), direction) & Tweens.GetName(GetType(Tweens), tween)
+        Return Transitions.GetName(GetType(Transitions), trans) & " " & duration & " " & Directions.GetName(GetType(Directions), direction) & " " & Tweens.GetName(GetType(Tweens), tween)
     End Function
 
 End Class

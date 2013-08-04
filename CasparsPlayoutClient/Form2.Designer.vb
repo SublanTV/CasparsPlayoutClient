@@ -23,6 +23,7 @@ Partial Class Form2
     <System.Diagnostics.DebuggerStepThrough()> _
     Private Sub InitializeComponent()
         Me.lstFrame = New System.Windows.Forms.ListBox()
+        Me.lstOffset = New System.Windows.Forms.ListBox()
         Me.SuspendLayout()
         '
         'lstFrame
@@ -30,14 +31,23 @@ Partial Class Form2
         Me.lstFrame.FormattingEnabled = True
         Me.lstFrame.Location = New System.Drawing.Point(12, 12)
         Me.lstFrame.Name = "lstFrame"
-        Me.lstFrame.Size = New System.Drawing.Size(121, 121)
+        Me.lstFrame.Size = New System.Drawing.Size(64, 121)
         Me.lstFrame.TabIndex = 3
+        '
+        'lstOffset
+        '
+        Me.lstOffset.FormattingEnabled = True
+        Me.lstOffset.Location = New System.Drawing.Point(82, 12)
+        Me.lstOffset.Name = "lstOffset"
+        Me.lstOffset.Size = New System.Drawing.Size(49, 121)
+        Me.lstOffset.TabIndex = 4
         '
         'Form2
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.ClientSize = New System.Drawing.Size(143, 144)
+        Me.Controls.Add(Me.lstOffset)
         Me.Controls.Add(Me.lstFrame)
         Me.Name = "Form2"
         Me.Text = "Form2"
@@ -45,4 +55,5 @@ Partial Class Form2
 
     End Sub
     Friend WithEvents lstFrame As System.Windows.Forms.ListBox
+    Friend WithEvents lstOffset As System.Windows.Forms.ListBox
 End Class
