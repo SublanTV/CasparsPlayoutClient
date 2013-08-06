@@ -32,7 +32,7 @@ Namespace My
         
         <Global.System.Diagnostics.DebuggerStepThroughAttribute()>  _
         Protected Overrides Sub OnCreateMainForm()
-            Me.MainForm = Global.CasparsPlayoutClient.Form1
+            Me.MainForm = Global.CasparsPlayoutClient.MainWindow
         End Sub
     End Class
 End Namespace

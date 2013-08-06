@@ -16,14 +16,21 @@
     Function getItemType() As PlaylistItem.PlaylistItemTypes ' Typ des Item
     Function isPlaying() As Boolean
     Function isPaused() As Boolean
-    Function getPlayed() As Single '% des Items gespielt
+    Function isWaiting() As Boolean
+    Function getPlayed() As Byte '% des Items gespielt
     Function getChildItems(Optional ByVal recursiv As Boolean = False) As List(Of IPlaylistItem) ' alle Items in diesem Item
     Function getPlayingChildItems(Optional ByVal recursiv As Boolean = False, Optional ByVal onlyPlayable As Boolean = False) As IEnumerable(Of IPlaylistItem) ' alle activen, spielenden Items in diesem Item
     Function getMedia() As CasparCGMedia
+    Function getFPS() As Integer
+    Function getController() As ServerController
+    Function getParent() As IPlaylistItem
+    Function hasPlayingParent() As Boolean
     'Function getLayerUser(Optional ByVal recursiv As Boolean = False) As Dictionary(Of Integer, Integer)
     Function toXML() As String
     Function toString() As String
 
+    Sub setParent(ByRef parent As IPlaylistItem)
+    Sub setName(ByVal name As String)
     Sub setLayer(ByVal layer As Integer)
     Sub setChannel(ByVal channel As Integer)
     Sub setLooping(ByVal looping As Boolean)
@@ -35,13 +42,22 @@
     Sub setRemaining(ByVal remaining As Long) ' noch zu spielende Frames
     Sub setChildItems(ByRef items As List(Of IPlaylistItem))
     Sub addItem(ByRef item As IPlaylistItem)
+    Sub removeChild(ByRef child As IPlaylistItem)
+    Sub insertChildAt(ByRef child As IPlaylistItem, ByRef position As IPlaylistItem)
+
+
     Sub loadXML(ByVal xml As String) ' Erstellt ein IPlaylistItem aus einer xml definition)
+
+
 
     Sub load() ' lädt wenn möglich item schon im Hintergrund (ACMP loadbg)
     Sub start(Optional ByVal noWait As Boolean = False)
+    Sub playNextItem()
     Sub abort() ' stopt item (ACMP stop)
     Sub stoppedPlaying() ' informs item that it has stopped playing
     Sub pause(ByVal frames As Long) ' pausiert das Spielen des Items for frames Frames oder bis zum manuellen start bei 0 (ACMP pause)
     Sub unPause()
+
+    Event waitForNext()
 
 End Interface

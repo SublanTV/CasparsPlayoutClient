@@ -26,9 +26,10 @@
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationRevision>2</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
+    <PublishWizardCompleted>true</PublishWizardCompleted>
     <BootstrapperEnabled>true</BootstrapperEnabled>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
@@ -68,6 +69,18 @@
   <PropertyGroup>
     <ApplicationManifest>My Project\app.manifest</ApplicationManifest>
   </PropertyGroup>
+  <PropertyGroup>
+    <ManifestCertificateThumbprint>CD768CDD2B94F9EFD60CE9786ADE5A486CE40680</ManifestCertificateThumbprint>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ManifestKeyFile>CasparsPlayoutClient_TemporaryKey.pfx</ManifestKeyFile>
+  </PropertyGroup>
+  <PropertyGroup>
+    <GenerateManifests>true</GenerateManifests>
+  </PropertyGroup>
+  <PropertyGroup>
+    <SignManifests>true</SignManifests>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
@@ -92,26 +105,44 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CasparCG.vb" />
-    <Compile Include="Form1.vb">
+    <Compile Include="Controls\LibraryView.Designer.vb">
+      <DependentUpon>LibraryView.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\LibraryView.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Controls\LibraryViewItem.Designer.vb">
+      <DependentUpon>LibraryViewItem.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\LibraryViewItem.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\Form1.vb">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Form1.Designer.vb">
+    <Compile Include="Forms\Form1.Designer.vb">
       <DependentUpon>Form1.vb</DependentUpon>
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Form2.Designer.vb">
+    <Compile Include="Forms\Form2.Designer.vb">
       <DependentUpon>Form2.vb</DependentUpon>
     </Compile>
-    <Compile Include="Form2.vb">
+    <Compile Include="Forms\Form2.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="IPlaylistItem.vb" />
     <Compile Include="Library.vb" />
     <Compile Include="logger.vb" />
-    <Compile Include="MediaMonitor.Designer.vb">
+    <Compile Include="Forms\MainWindow.Designer.vb">
+      <DependentUpon>MainWindow.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\MainWindow.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\MediaMonitor.Designer.vb">
       <DependentUpon>MediaMonitor.vb</DependentUpon>
     </Compile>
-    <Compile Include="MediaMonitor.vb">
+    <Compile Include="Forms\MediaMonitor.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="My Project\AssemblyInfo.vb" />
@@ -133,15 +164,30 @@
     <Compile Include="PlaylistItem.vb" />
     <Compile Include="PlaylistMovieItem.vb" />
     <Compile Include="ServerController.vb" />
+    <Compile Include="Controls\PlaylistView.Designer.vb">
+      <DependentUpon>PlaylistView.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\PlaylistView.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Form1.resx">
+    <EmbeddedResource Include="Controls\LibraryView.resx">
+      <DependentUpon>LibraryView.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Controls\LibraryViewItem.resx">
+      <DependentUpon>LibraryViewItem.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\Form1.resx">
       <DependentUpon>Form1.vb</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="Form2.resx">
+    <EmbeddedResource Include="Forms\Form2.resx">
       <DependentUpon>Form2.vb</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="MediaMonitor.resx">
+    <EmbeddedResource Include="Forms\MainWindow.resx">
+      <DependentUpon>MainWindow.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\MediaMonitor.resx">
       <DependentUpon>MediaMonitor.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="My Project\Resources.resx">
@@ -150,8 +196,12 @@
       <CustomToolNamespace>My.Resources</CustomToolNamespace>
       <SubType>Designer</SubType>
     </EmbeddedResource>
+    <EmbeddedResource Include="Controls\PlaylistView.resx">
+      <DependentUpon>PlaylistView.vb</DependentUpon>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
+    <None Include="CasparsPlayoutClient_TemporaryKey.pfx" />
     <None Include="My Project\app.manifest" />
     <None Include="My Project\Application.myapp">
       <Generator>MyApplicationCodeGenerator</Generator>

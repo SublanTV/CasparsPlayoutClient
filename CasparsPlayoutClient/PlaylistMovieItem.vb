@@ -18,8 +18,8 @@
             If movie.getInfos.Count = 0 Then
                 movie.parseXML(getController.getMediaInfo(movie))
             End If
-            If movie.containsInfo("nb-frames") AndAlso (duration > Long.Parse(movie.getInfo("nb-frames")) OrElse duration = -1) Then
-                setDuration(Long.Parse(movie.getInfo("nb-frames")))
+            If movie.containsInfo("nb-frames") AndAlso (duration > getController.getOriginalMediaDuration(movie) OrElse duration = -1) Then
+                setDuration(getController.getOriginalMediaDuration(movie))
             End If
             media = movie
         Else
@@ -34,23 +34,28 @@
     Public Overrides Sub start(Optional ByVal noWait As Boolean = False)
         '' CMD an ServerController schicken
         logger.log("PlaylistMovieItem.start: Starte " & getChannel() & "-" & getLayer() & ": " & getMedia.toString)
-        Dim result = getController.getCommandConnection.sendCommand(CasparCGCommandFactory.getPlay(getChannel, getLayer, getMedia, isLooping, , getDuration))
-        If result.isOK Then
-            While Not getController.readyForUpdate.WaitOne()
-                logger.warn("PlaylistMovieItem.start: " & getName() & ": Could not get handel to update my status")
-            End While
-            playing = True
-            getController.readyForUpdate.Release()
-            getController.getCommandConnection.sendAsyncCommand(CasparCGCommandFactory.getLoadbg(getChannel, getLayer, "empty", True))
-            logger.log("PlaylistMovieItem.start: ...gestartet " & getChannel() & "-" & getLayer() & ": " & getMedia.toString)
-        Else
-            logger.err("PlaylistMovieItem.start: Could not start " & media.getFullName & ". ServerMessage was: " & result.getServerMessage)
-        End If
+        If getController.containsChannel(getChannel) AndAlso getLayer() > -1 Then
+            Dim result = getController.getCommandConnection.sendCommand(CasparCGCommandFactory.getPlay(getChannel, getLayer, getMedia, isLooping, , getDuration))
+            If result.isOK Then
+                While Not getController.readyForUpdate.WaitOne()
+                    logger.warn("PlaylistMovieItem.start: " & getName() & ": Could not get handel to update my status")
+                End While
+                playing = True
+                getController.readyForUpdate.Release()
+                getController.getCommandConnection.sendAsyncCommand(CasparCGCommandFactory.getLoadbg(getChannel, getLayer, "empty", True))
+                logger.log("PlaylistMovieItem.start: ...gestartet " & getChannel() & "-" & getLayer() & ": " & getMedia.toString)
+            Else
+                logger.err("PlaylistMovieItem.start: Could not start " & media.getFullName & ". ServerMessage was: " & result.getServerMessage)
+            End If
 
-        While isPlaying() AndAlso Not noWait
-            'getController.update()
-            Threading.Thread.Sleep(1)
-        End While
+            While isPlaying() AndAlso Not noWait
+                'getController.update()
+
+                '#@#Threading.Thread.Sleep(1)
+            End While
+        Else
+            logger.err("PlaylistMovieItem.start: Error playing " & getName() & ". The channel " & getChannel() & " does not exist on the server. Aborting start.")
+        End If
     End Sub
 
     Public Overloads Sub abort()
@@ -78,12 +83,26 @@
     End Function
 
     Public Overrides Function getPosition() As Long
-        If getMedia.containsInfo("nb-frames") AndAlso getMedia.containsInfo("frame-number") Then
-            Return Long.Parse(getMedia.getInfo("frame-number"))
+        If getMedia.containsInfo("frame-number") AndAlso (isPlaying() OrElse hasPlayingParent()) Then
+            Return ServerController.getTimeInMS(Long.Parse(getMedia.getInfo("frame-number")), getFPS())
         Else
             Return 0
         End If
     End Function
+
+    Public Overrides Sub setPosition(ByVal position As Long)
+        If Not isPlaying() AndAlso getMedia.containsInfo("frame-number") Then
+            getMedia.setInfo("frame-number", "0")
+        End If
+    End Sub
+
+    Public Overrides Sub setChannel(ByVal channel As Integer)
+        MyBase.setChannel(channel)
+        If getController.containsChannel(channel) AndAlso Not IsNothing(getMedia) Then
+            setDuration(getController.getOriginalMediaDuration(getMedia))
+        End If
+    End Sub
+
 
     '' Methoden die Überschrieben werden müssen weil sie leer sind
     ''-------------------------------------------------------------

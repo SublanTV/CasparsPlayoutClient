@@ -10,51 +10,52 @@ Public Class PlaylistBlockItem
         MyBase.New(name, PlaylistItemTypes.BLOCK, controller, channel, layer, 0)
     End Sub
 
-    Public Overloads Function isPlaying()
+    Public Overrides Function isPlaying() As Boolean
+        If isWaiting() Then Return True
         For Each child In getChildItems()
-            If child.isPlaying Then Return True
+            If child.isPlaying OrElse child.isWaiting Then Return True
         Next
         Return False
     End Function
 
-    'Private Sub receiveTick(ByVal sender As Object, ByVal e As frameTickEventArgs)
-    '    '' Verarbeitet tickEvents
-    '    ''
-    '    '' wenn seq. dann schauen ob das zuletzt aktive child
-    '    '' nicht mehr aktiv ist und das nächste starten
-
-    '    If Not isParallel() Then
-    '        '' Wenn das zuletzt gespielte nicht mehr aktiv ist
-    '        '' das nächste starten falls möglich
-    '        If lastPlaying > -1 Then
-    '            If getChildItems.Count > lastPlaying + 1 AndAlso Not getChildItems().Item(lastPlaying).isPlaying Then
-    '                getChildItems().Item(lastPlaying + 1).start()
-    '            End If
-    '        End If
-    '    End If
-
-    '    If Not isPlaying() Then
-    '        abort()
-    '    End If
-
-    'End Sub
-
-    'Public Overrides Sub stoppedPlaying()
-    '    lastPlaying = getChildItems().Count
-    '    MyBase.stoppedPlaying()
-    'End Sub
-
     Public Overrides Sub start(Optional ByVal noWait As Boolean = False)
+        For Each child In getChildItems(True)
+            If child.isPlayable Then
+                child.setPosition(0)
+            End If
+        Next
         MyBase.start(noWait)
-
-        While isPlaying() AndAlso Not isParallel()
+        While isPlaying() 'AndAlso Not isParallel()
             Thread.Sleep(1)
         End While
-        'AddHandler getController.getTicker.frameTick, AddressOf receiveTick
     End Sub
 
-    'Public Overloads Sub abort()
-    '    MyBase.abort()
-    '    'RemoveHandler getController.getTicker.frameTick, AddressOf receiveTick
-    'End Sub
+    Public Overrides Function getPosition() As Long
+        If IsNothing(getParent) OrElse getParent.isPlaying() Then
+            Dim pos As Long
+            For Each child In getChildItems()
+                If isParallel() Then
+                    pos = Math.Max(pos, child.getPosition)
+                Else
+                    pos = pos + child.getPosition
+                End If
+            Next
+            Return pos
+        Else
+            Return 0
+        End If
+    End Function
+
+    Public Overrides Function getDuration() As Long
+        Dim duration As Long
+        For Each child In getChildItems()
+            If isParallel() Then
+                duration = Math.Max(duration, child.getDuration)
+            Else
+                duration = duration + child.getDuration
+            End If
+        Next
+        Return duration
+    End Function
+
 End Class

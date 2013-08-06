@@ -7,20 +7,23 @@ Public Class Form1
     Private nf As Integer = 0
 
     Private Sub Button1_Click(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles Button1.Click
-        logger.debug("Try to connect casparCG server..")
-        If IsNothing(sc) Then
-            sc = New ServerController()
-        End If
-        If Not sc.isOpen() Then
-            sc.open("casparcg", 5250)
-        End If
+        'logger.debug("Try to connect casparCG server..")
+        'If IsNothing(sc) Then
+        '    sc = New ServerController()
+        'End If
+        'If Not sc.isOpen() Then
+        '    sc.open("casparcg", 5250)
+        'End If
 
-        'Thread.Sleep(1000)
-        Dim mediaMon As New MediaMonitor(sc)
-        mediaMon.Show()
-        openListener()
-        testPlaylist()
+        ''Thread.Sleep(1000)
+        'Dim mediaMon As New MediaMonitor(sc)
+        ''mediaMon.Show()
+        ''openListener()
+        ''testPlaylist()
+        'doIt()
 
+        Dim mainform As New MainWindow()
+        mainform.Show()
 
     End Sub
 
@@ -55,7 +58,7 @@ Public Class Form1
         sc.getPlaylistRoot.addItem(pp)
         'p1 = New PlaylistMovieItem("S3", sc, mediaLib.getItem("amb"), 3, 1)
         'sc.getPlaylistRoot.addItem(p1)
-        sc.startTicker()
+        'sc.startTicker()
         'openListener()
 
         'p2.start()

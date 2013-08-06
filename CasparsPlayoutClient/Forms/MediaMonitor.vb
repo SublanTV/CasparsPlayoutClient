@@ -49,23 +49,23 @@
     End Sub
 
     Private Sub updateView()
-        lsvPlayingMedia.Items.Clear()
-        For Each item In sc.getPlaylistRoot.getPlayingChildItems(True, True)
-            Dim line As New ListViewItem(item.getName)
-            line.Name = item.toString
-            Dim ts = TimeSpan.FromMilliseconds(sc.getTimeInMS(item.getDuration, sc.getFPS(item.getChannel)))
-            With line.SubItems
-                .Add(item.getChannel)
-                .Add(item.getLayer)
-                .Add(ts.ToString("g"))
-                ts = TimeSpan.FromMilliseconds(sc.getTimeInMS(item.getRemaining, sc.getFPS(item.getChannel)))
-                .Add(ts.ToString("g"))
-                .Add(item.getPlayed)
-            End With
-            If lsvPlayingMedia.Items.ContainsKey(item.toString) Then
-                lsvPlayingMedia.Items(item.toString).Remove()
+        'lsvPlayingMedia.Items.Clear()
+        For Each item In sc.getPlaylistRoot.getChildItems(True)
+            If (item.isPlayable AndAlso item.isPlaying) Then 'OrElse lsvPlayingMedia.Items.ContainsKey(item.toString) Then
+                Dim line As New ListViewItem(item.getName)
+                line.Name = item.toString
+                With line.SubItems
+                    .Add(item.getChannel)
+                    .Add(item.getLayer)
+                    .Add(ServerController.getTimeStringOfMS(item.getDuration))
+                    .Add(ServerController.getTimeStringOfMS(item.getRemaining))
+                    .Add(item.getPlayed)
+                End With
+                If lsvPlayingMedia.Items.ContainsKey(item.toString) Then
+                    lsvPlayingMedia.Items(item.toString).Remove()
+                End If
+                lsvPlayingMedia.Items.Add(line)
             End If
-            lsvPlayingMedia.Items.Add(line)
         Next
     End Sub
 End Class

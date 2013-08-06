@@ -1,25 +1,31 @@
 ﻿Public MustInherit Class PlaylistItem
     Implements IPlaylistItem
 
-    Private _name As String
+    Private name As String
     Private layer As Integer
     Private channel As Integer
     Private delay As Long
     Private looping As Boolean
     Private autoStart As Boolean
     Private parallel As Boolean
+    Private fps As Integer
+    Private parent As IPlaylistItem
 
     ' Die (Kinder)Items dieses Items
     Private items As List(Of IPlaylistItem)
     Private WithEvents controller As ServerController
-    Private _Duration As Long ' Gesamtlaufzeit in Frames
-    Private _Position As Long ' aktuelle Frame
-    Private _Remaining As Long ' noch zu spielende Frames
+    Private Duration As Long ' Gesamtlaufzeit in Frames
+    Private Position As Long ' aktuelle Frame
+    Private Remaining As Long ' noch zu spielende Frames
     Private ItemType As PlaylistItem.PlaylistItemTypes ' Typ des Item
     Friend playing As Boolean
     Private paused As Boolean
     Private startThread As Threading.Thread
     Private pauseThread As Threading.Thread
+    Private playNext As Boolean = False
+    Private waiting As Boolean = False
+
+    Public Event waitForNext() Implements IPlaylistItem.waitForNext
 
     Enum PlaylistItemTypes
         BLOCK = -1
@@ -39,7 +45,7 @@
     ''' <param name="duration"></param>
     ''' <remarks></remarks>
     Protected Sub New(ByVal name As String, ByVal itemType As PlaylistItemTypes, ByRef controller As ServerController, Optional ByVal channel As Integer = -1, Optional ByVal layer As Integer = -1, Optional ByVal duration As Long = -1)
-        Me._name = name
+        Me.name = name
         Me.ItemType = itemType
         Me.controller = controller
         setChannel(channel)
@@ -89,7 +95,7 @@
         '' wecker der nach dieser Zeit die Pause aufhebt.
         If frames >= 0 Then
             pauseThread = New Threading.Thread(AddressOf Me.unPause)
-            pauseThread.Start(controller.getTimeInMS(frames, channel))
+            pauseThread.Start(ServerController.getTimeInMS(frames, getFPS))
         End If
         paused = True
     End Sub
@@ -114,9 +120,9 @@
     ''' <param name="noWait"></param>
     ''' <remarks></remarks>
     Public Overridable Sub start(Optional ByVal noWait As Boolean = False) Implements IPlaylistItem.start
-        logger.log("PlaylistItem.start: " & getName() & ": received start at thread " & Threading.Thread.CurrentThread.ManagedThreadId)
+        logger.debug("PlaylistItem.start: " & getName() & ": received start at thread " & Threading.Thread.CurrentThread.ManagedThreadId)
         If noWait Then
-            logger.log("PlaylistItem.start: " & getName() & ": noWait is true. Start new thread")
+            logger.debug("PlaylistItem.start: " & getName() & ": noWait is true. Start new thread")
             If Not IsNothing(startThread) Then
                 startThread.Abort()
             End If
@@ -130,11 +136,30 @@
             ' Wenn parallel, dann wird nicht gewaret und alle starten
             ' semi gleichzeitig
             ' Sost startet das nächste erst wenn das vorherige fertig ist.
+            If Not isAutoStarting() AndAlso Not playNext Then
+                RaiseEvent waitForNext()
+                waiting = True
+                While Not playNext
+                    Threading.Thread.Sleep(1)
+                End While
+                playNext = False
+                waiting = False
+            End If
             For Each item In items
                 item.start(isParallel)
             Next
+            If isLooping() Then
+                While isPlaying()
+                    Threading.Thread.Sleep(1)
+                End While
+                start()
+            End If
         End If
         logger.debug("PlaylistItem.start: Start " & getName() & " has been completed")
+    End Sub
+
+    Public Sub playNextItem() Implements IPlaylistItem.playNextItem
+        playNext = True
     End Sub
 
     Public Overrides Function toString() As String Implements IPlaylistItem.toString
@@ -143,14 +168,14 @@
 
     Public Function toXML() As String Implements IPlaylistItem.toXML
         Dim xml As String = "<item><name>" & _
-            _name & "</name><type>" & _
+            name & "</name><type>" & _
             getItemType.ToString & "</type><layer>" & _
             layer.ToString & "</layer><channel>" & _
             channel.ToString & "</channel><autostarting>" & _
             isAutoStarting.ToString & "</autostarting><isParallel>" & _
             isParallel.ToString & "</isParallel><isLooping>" & _
             isLooping.ToString & "</isLooping><duration>" & _
-            _Duration.ToString & "</duration><delay>" & _
+            Duration.ToString & "</duration><delay>" & _
             delay.ToString & "</delay> "
         For Each item As IPlaylistItem In items
             xml = xml & item.toXML
@@ -166,6 +191,10 @@
     '' GETTER:
     ''--------
 
+    Public Function getParent() As IPlaylistItem Implements IPlaylistItem.getParent
+        Return parent
+    End Function
+
     Public Function getChannel() As Integer Implements IPlaylistItem.getChannel
         Return channel
     End Function
@@ -179,7 +208,7 @@
     End Function
 
     Public Function getName() As String Implements IPlaylistItem.getName
-        Return _name
+        Return name
     End Function
 
     Public Function isAutoStarting() As Boolean Implements IPlaylistItem.isAutoStarting
@@ -194,8 +223,12 @@
         Return parallel
     End Function
 
+    Public Function isWaiting() As Boolean Implements IPlaylistItem.isWaiting
+        Return waiting
+    End Function
+
     Public Overridable Function getDuration() As Long Implements IPlaylistItem.getDuration
-        Return _Duration
+        Return Duration
     End Function
 
     Public Function getItemType() As PlaylistItemTypes Implements IPlaylistItem.getItemType
@@ -203,7 +236,7 @@
     End Function
 
     Public Overridable Function getPosition() As Long Implements IPlaylistItem.getPosition
-        Return _Position
+        Return Position
     End Function
 
     Public Overridable Function getRemaining() As Long Implements IPlaylistItem.getRemaining
@@ -237,11 +270,15 @@
         Return childItems
     End Function
 
-    Public Overridable Function getPlayed() As Single Implements IPlaylistItem.getPlayed
-        Return (1 / getDuration()) * getPosition()
+    Public Overridable Function getPlayed() As Byte Implements IPlaylistItem.getPlayed
+        If getDuration() > 0 Then
+            Return (100 / getDuration()) * getPosition()
+        Else
+            Return 0
+        End If
     End Function
 
-    Public Function isPlaying() As Boolean Implements IPlaylistItem.isPlaying
+    Public Overridable Function isPlaying() As Boolean Implements IPlaylistItem.isPlaying
         Return playing
     End Function
 
@@ -258,7 +295,7 @@
         End Select
     End Function
 
-    Public Function getController() As ServerController
+    Public Function getController() As ServerController Implements IPlaylistItem.getController
         Return controller
     End Function
 
@@ -266,12 +303,32 @@
         Return Nothing
     End Function
 
+    Friend Function getFPS() As Integer Implements IPlaylistItem.getFPS
+        If fps <= 0 Then
+            Return getController.getFPS(getChannel)
+        Else
+            Return fps
+        End If
+    End Function
+
+    Public Function hasPlayingParent() As Boolean Implements IPlaylistItem.hasPlayingParent
+        If IsNothing(getParent) Then
+            Return False
+        Else
+            Return getParent.isPlaying OrElse getParent.hasPlayingParent
+        End If
+    End Function
+
 
     '' SETTER:
     ''---------
 
-    Public Sub setName(ByVal Name As String)
-        Me._name = Name
+    Public Sub setParent(ByRef parent As IPlaylistItem) Implements IPlaylistItem.setParent
+        Me.parent = parent
+    End Sub
+
+    Public Sub setName(ByVal Name As String) Implements IPlaylistItem.setName
+        Me.name = Name
     End Sub
 
     Public Sub setChildItems(ByRef items As System.Collections.Generic.List(Of IPlaylistItem)) Implements IPlaylistItem.setChildItems
@@ -282,15 +339,15 @@
     End Sub
 
     Public Sub setDuration(ByVal duration As Long) Implements IPlaylistItem.setDuration
-        Me._Duration = duration
+        Me.Duration = duration
     End Sub
 
-    Public Sub setPosition(ByVal position As Long) Implements IPlaylistItem.setPosition
-        Me._Position = position
+    Public Overridable Sub setPosition(ByVal position As Long) Implements IPlaylistItem.setPosition
+        Me.Position = position
     End Sub
 
     Public Sub setRemaining(ByVal remaining As Long) Implements IPlaylistItem.setRemaining
-        Me._Remaining = remaining
+        Me.Remaining = remaining
     End Sub
 
     Public Sub addItem(ByRef item As IPlaylistItem) Implements IPlaylistItem.addItem
@@ -303,6 +360,7 @@
                 item.setLayer(getLayer)
             End If
 
+            item.setParent(Me)
             items.Add(item)
             If isParallel() Then
                 setDuration(Math.Max(getDuration, item.getDuration))
@@ -316,10 +374,13 @@
         Me.autoStart = autoStart
     End Sub
 
-    Public Sub setChannel(ByVal channel As Integer) Implements IPlaylistItem.setChannel
+    Public Overridable Sub setChannel(ByVal channel As Integer) Implements IPlaylistItem.setChannel
         If channel <> -1 Then
             If Not controller.containsChannel(channel) Then
                 logger.warn("PlaylistItem.setChannel: Playlist " & getName() & ": The channel " & channel & " is not configured at the given server. This could lead to errors during playlist playback.")
+                fps = -1
+            Else
+                fps = getController.getFPS(channel)
             End If
         End If
         Me.channel = channel
@@ -344,6 +405,18 @@
 
     Public Sub setParallel(ByVal parallel As Boolean) Implements IPlaylistItem.setParallel
         Me.parallel = parallel
+    End Sub
+
+    Public Sub removeChild(ByRef child As IPlaylistItem) Implements IPlaylistItem.removeChild
+        If items.Contains(child) Then
+            items.Remove(child)
+        End If
+    End Sub
+
+    Public Sub insertChildAt(ByRef child As IPlaylistItem, ByRef position As IPlaylistItem) Implements IPlaylistItem.insertChildAt
+        If items.Contains(position) Then
+            items.Insert(items.IndexOf(position), child)
+        End If
     End Sub
 
 End Class

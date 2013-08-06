@@ -12,8 +12,9 @@ Public Class ServerController
     Private tickThread As Thread
     Private serverAddress As String = "localhost"
     Private serverPort As Integer = 5250
-    Private testChannel As Integer = 4
+    Private testChannel As Integer = 2
     Private channels As Integer
+    Private channelFPS() As Integer
     Private opened As Boolean
     Private WithEvents ticker As FrameTicker
     Private updater As mediaUpdater
@@ -31,16 +32,34 @@ Public Class ServerController
     Public Sub close()
         logger.debug("ServerController.close: Close servercontroller...")
         opened = False
-        If Not IsNothing(updateThread) Then updateThread.Abort()
-        If Not IsNothing(tickThread) Then tickThread.Abort()
-        updateConnection.close()
-        tickConnection.close()
-        testConnection.close()
-        cmdConnection.close()
+        Try
+            If Not IsNothing(tickThread) Then
+                tickThread.Interrupt()
+                tickThread.Abort()
+            End If
+            If Not IsNothing(updateThread) Then
+                updateThread.Interrupt()
+                updateThread.Abort()
+            End If
+        Catch e As ThreadInterruptedException
+        End Try
+        If Not IsNothing(updateConnection) Then updateConnection.close()
+        If Not IsNothing(tickConnection) Then tickConnection.close()
+        If Not IsNothing(testConnection) Then testConnection.close()
+        If Not IsNothing(cmdConnection) Then cmdConnection.close()
+        channels = 0
+        ReDim channelFPS(0)
     End Sub
 
     Public Function isOpen() As Boolean
         Return opened
+    End Function
+
+    Public Function isConnected() As Boolean
+        Return Not IsNothing(updateConnection) AndAlso Not IsNothing(tickConnection) AndAlso Not _
+            IsNothing(cmdConnection) AndAlso Not IsNothing(testConnection) AndAlso _
+            updateConnection.connected AndAlso tickConnection.connected AndAlso _
+            cmdConnection.connected AndAlso testConnection.connected
     End Function
 
     Public Sub open(ByVal serverAddress As String, ByVal severPort As Integer)
@@ -61,9 +80,13 @@ Public Class ServerController
         If channels = testChannel - 1 Then
             channels = channels - 1
         End If
+        ReDim channelFPS(channels - 1)
+        For c As Integer = 0 To channels - 1
+            channelFPS(c) = getChannelFPS(c + 1)
+        Next
 
         ' Tick Thread starten
-        ticker = New FrameTicker(tickConnection, Me, , 1)
+        ticker = New FrameTicker(tickConnection, Me, , 10)
         'tickThread = New Thread(AddressOf ticker.tick)
         'tickThread.Start()
 
@@ -90,11 +113,13 @@ Public Class ServerController
 
     Private Function readServerChannels() As Integer
         Dim ch As Integer = 0
-        Dim response = testConnection.sendCommand(CasparCGCommandFactory.getInfo())
-        If response.isOK Then
-            Dim lineArray() = response.getData.Split(vbLf)
-            If Not IsNothing(lineArray) Then
-                ch = lineArray.Length
+        If isConnected() Then
+            Dim response = testConnection.sendCommand(CasparCGCommandFactory.getInfo())
+            If response.isOK Then
+                Dim lineArray() = response.getData.Split(vbLf)
+                If Not IsNothing(lineArray) Then
+                    ch = lineArray.Length
+                End If
             End If
         End If
         Return ch
@@ -108,26 +133,29 @@ Public Class ServerController
     ''' <returns></returns>
     ''' <remarks></remarks>
     Public Function getOriginalMediaDuration(ByRef media As CasparCGMedia) As Long
-        Select Case media.getMediaType
-            Case CasparCGMedia.MediaType.COLOR, CasparCGMedia.MediaType.STILL, CasparCGMedia.MediaType.TEMPLATE
-                '' These mediatyps doesn't have any durations
-                Return 0
-            Case Else
-                If media.getInfos.Count = 0 Then
-                    '' no media info is loaded
-                    '' load it now
-                    media.parseXML(getMediaInfo(media))
-                End If
-                If media.containsInfo("nb-frames") AndAlso media.containsInfo("fps") AndAlso media.containsInfo("progressive") Then
-                    Dim fps As Integer = Integer.Parse(media.getInfo("fps"))
-                    If Not Boolean.Parse(media.getInfo("progressive")) Then
-                        fps = fps / 2
+        If isConnected() Then
+            Select Case media.getMediaType
+                Case CasparCGMedia.MediaType.COLOR, CasparCGMedia.MediaType.STILL, CasparCGMedia.MediaType.TEMPLATE
+                    '' These mediatyps doesn't have any durations
+                    Return 0
+                Case Else
+                    If media.getInfos.Count = 0 Then
+                        '' no media info is loaded
+                        '' load it now
+                        media.parseXML(getMediaInfo(media))
                     End If
-                    Return getTimeInMS(media.getInfo("nb-frames"), fps)
-                End If
-                logger.err("ServerController.getOriginalMediaDuration: Could not get media duration of " & media.getFullName & "(" & media.getMediaType.ToString & ").")
-                Return 0
-        End Select
+                    If media.containsInfo("file-nb-frames") AndAlso media.containsInfo("fps") AndAlso media.containsInfo("progressive") Then
+                        Dim fps As Integer = Single.Parse(media.getInfo("fps")) * 100
+                        Dim progressive = Boolean.Parse(media.getInfo("progressive"))
+                        'If Not progressive Then
+                        '    fps = fps / 2
+                        'End If
+                        Return getTimeInMS(media.getInfo("file-nb-frames"), fps)
+                    End If
+                    logger.err("ServerController.getOriginalMediaDuration: Could not get media duration of " & media.getFullName & "(" & media.getMediaType.ToString & ").")
+            End Select
+        End If
+        Return 0
     End Function
 
     ''' <summary>
@@ -137,22 +165,29 @@ Public Class ServerController
     ''' <returns></returns>
     ''' <remarks></remarks>
     Public Function getMediaDuration(ByRef media As CasparCGMedia, ByVal channel As Integer) As Long
-        Select Case media.getMediaType
-            Case CasparCGMedia.MediaType.COLOR, CasparCGMedia.MediaType.STILL, CasparCGMedia.MediaType.TEMPLATE
-                '' These mediatyps doesn't have any durations
-                Return 0
-            Case Else
-                If media.getInfos.Count = 0 Then
-                    '' no media info is loaded
-                    '' load it now
-                    media.parseXML(getMediaInfo(media))
-                End If
-                If media.containsInfo("nb-frames") Then
-                    Return getTimeInMS(media.getInfo("nb-frames"), getFPS(channel))
-                End If
-                logger.err("ServerController.getMediaDuration: Could not get media duration of " & media.getFullName & "(" & media.getMediaType.ToString & ").")
-                Return 0
-        End Select
+
+        Return getOriginalMediaDuration(media)
+
+        '' Scheint nicht nötig zu sein da die videos IMMER so lange spielen wie sie sollen
+        '' zumindest wenn die metadaten stimmen - aber erst noch ausgiebig testen!
+        If isConnected() Then
+            Select Case media.getMediaType
+                Case CasparCGMedia.MediaType.COLOR, CasparCGMedia.MediaType.STILL, CasparCGMedia.MediaType.TEMPLATE
+                    '' These mediatyps doesn't have any durations
+                    Return 0
+                Case Else
+                    If media.getInfos.Count = 0 Then
+                        '' no media info is loaded
+                        '' load it now
+                        media.parseXML(getMediaInfo(media))
+                    End If
+                    If media.containsInfo("nb-frames") Then
+                        Return getTimeInMS(media.getInfo("nb-frames"), getFPS(channel))
+                    End If
+                    logger.err("ServerController.getMediaDuration: Could not get media duration of " & media.getFullName & "(" & media.getMediaType.ToString & ").")
+            End Select
+        End If
+        Return 0
     End Function
 
     ''' <summary>
@@ -162,11 +197,7 @@ Public Class ServerController
     ''' <returns></returns>
     ''' <remarks></remarks>
     Public Function containsChannel(ByVal channel As Integer) As Boolean
-        If Not IsNothing(testConnection) Then
-            Return testConnection.sendCommand(CasparCGCommandFactory.getInfo(channel)).isOK
-        Else
-            Return False
-        End If
+        Return channel <= channels AndAlso channel > 0
     End Function
 
     ''' <summary>
@@ -191,32 +222,43 @@ Public Class ServerController
     ''' <returns></returns>
     ''' <remarks></remarks>
     Public Function isLayerFree(ByVal layer As Integer, ByVal channel As Integer, Optional ByVal onlyForeground As Boolean = False, Optional ByVal onlyBackground As Boolean = False) As Boolean
-        Dim answer = testConnection.sendCommand(CasparCGCommandFactory.getInfo(channel, layer, onlyBackground, onlyForeground))
-        Dim doc As New MSXML2.DOMDocument()
-        If answer.isOK AndAlso doc.loadXML(answer.getXMLData) Then
-            For Each type As MSXML2.IXMLDOMNode In doc.getElementsByTagName("type")
-                If Not type.nodeTypedValue.Equals("empty-producer") Then
-                    Return False
-                End If
-            Next
-            Return True
-        Else
-            If Not IsNothing(doc.parseError) Then
-                logger.warn("ServerController.isLayerFree: Error checking layer." & vbNewLine & doc.parseError.reason & vbNewLine & doc.parseError.line & ":" & doc.parseError.linepos & vbNewLine & doc.parseError.srcText)
-                logger.warn("Server command and response was: " & answer.getCommand & vbNewLine & answer.getServerMessage)
+        If isConnected() Then
+            Dim answer = testConnection.sendCommand(CasparCGCommandFactory.getInfo(channel, layer, onlyBackground, onlyForeground))
+            Dim doc As New MSXML2.DOMDocument()
+            If answer.isOK AndAlso doc.loadXML(answer.getXMLData) Then
+                For Each type As MSXML2.IXMLDOMNode In doc.getElementsByTagName("type")
+                    If Not type.nodeTypedValue.Equals("empty-producer") Then
+                        Return False
+                    End If
+                Next
+                Return True
             Else
-                logger.warn("ServerController.isLayerFree: Could not check layer. Server response was incorrect.")
+                If Not IsNothing(doc.parseError) Then
+                    logger.warn("ServerController.isLayerFree: Error checking layer." & vbNewLine & doc.parseError.reason & vbNewLine & doc.parseError.line & ":" & doc.parseError.linepos & vbNewLine & doc.parseError.srcText)
+                    logger.warn("Server command and response was: " & answer.getCommand & vbNewLine & answer.getServerMessage)
+                Else
+                    logger.warn("ServerController.isLayerFree: Could not check layer. Server response was incorrect.")
+                End If
             End If
         End If
         Return False
     End Function
 
-    Public Function getTimeStringOfMS(ByVal milliseconds As Long) As String
-        Dim time As String = Str(milliseconds / 3600000).Substring(0, 2) & ":" & _
-                            Str(milliseconds / 60000).Substring(0, 2) & ":" & _
-                            Str(milliseconds / 1000).Substring(0, 2) & "." & _
-                            Str(milliseconds Mod 1000).Substring(0, 2)
-        Return time
+    ''' <summary>
+    ''' Returns the given number of milliseconds as a formated String "*hh:mm:ss.µµ" where h = hours, m = minutes, s = seconds and µ = milliseconds.
+    ''' </summary>
+    ''' <param name="milliseconds"></param>
+    ''' <returns></returns>
+    ''' <remarks></remarks>
+    Public Shared Function getTimeStringOfMS(ByVal milliseconds As Long) As String
+        If milliseconds > 0 Then
+            Dim h As String = Convert.ToUInt16(Math.Truncate(milliseconds / 3600000)).ToString("D2")
+            Dim m As String = Convert.ToUInt16(Math.Truncate((milliseconds / 60000) Mod 60)).ToString("D2")
+            Dim s As String = Convert.ToUInt16(Math.Truncate((milliseconds / 1000) Mod 60)).ToString("D2")
+            Dim ms As String = Convert.ToUInt16(Math.Truncate(milliseconds Mod 1000)).ToString("D2").Substring(0, 2)
+            Return h & ":" & m & ":" & s & "." & ms
+        Else : Return "00:00:00.00"
+        End If
     End Function
 
 
@@ -227,8 +269,16 @@ Public Class ServerController
     ''' <param name="fps">the framerate multiplied by 100 to avoid floating numbers like 59.94.</param> 
     ''' <returns></returns>
     ''' <remarks></remarks>
-    Public Function getTimeInMS(ByVal frames As Long, ByVal fps As Integer) As Long
+    Public Shared Function getTimeInMS(ByVal frames As Long, ByVal fps As Integer) As Long
+        If fps = 0 Then fps = -100
         Return (frames * 1000) / (fps / 100)
+    End Function
+
+    Public Function getFPS(ByVal channel As Integer) As Integer
+        If containsChannel(channel) Then
+            Return channelFPS(channel - 1)
+        End If
+        Return 0
     End Function
 
     ''' <summary>
@@ -237,60 +287,68 @@ Public Class ServerController
     ''' <param name="channel"></param>
     ''' <returns></returns>
     ''' <remarks></remarks>
-    Public Function getFPS(ByVal channel As Integer) As Integer
-        Dim result = testConnection.sendCommand(CasparCGCommandFactory.getInfo(channel))
-        Dim infoDoc As New MSXML2.DOMDocument
-        If infoDoc.loadXML(result.getXMLData()) Then
-            If infoDoc.hasChildNodes Then
-                If Not IsNothing(infoDoc.selectSingleNode("channel")) AndAlso Not IsNothing(infoDoc.selectSingleNode("channel").selectSingleNode("video-mode")) Then
-                    Select Case infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue
-                        Case "PAL"
-                            Return 2500
-                        Case "NTSC"
-                            Return 2994
-                        Case Else
-                            If infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue.Contains("i") Then
-                                Return Integer.Parse(infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue.Substring(infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue.IndexOf("i") + 1)) / 2
-                            ElseIf infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue.Contains("p") Then
-                                Return Integer.Parse(infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue.Substring(infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue.IndexOf("p") + 1))
-                            End If
-                    End Select
+    Private Function getChannelFPS(ByVal channel As Integer) As Integer
+        If isConnected() Then
+            If containsChannel(channel) Then
+                Dim result = testConnection.sendCommand(CasparCGCommandFactory.getInfo(channel))
+                Dim infoDoc As New MSXML2.DOMDocument
+                If infoDoc.loadXML(result.getXMLData()) Then
+                    If infoDoc.hasChildNodes Then
+                        If Not IsNothing(infoDoc.selectSingleNode("channel")) AndAlso Not IsNothing(infoDoc.selectSingleNode("channel").selectSingleNode("video-mode")) Then
+                            Select Case infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue
+                                Case "PAL"
+                                    Return 2500
+                                Case "NTSC"
+                                    Return 2994
+                                Case Else
+                                    If infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue.Contains("i") Then
+                                        Return Integer.Parse(infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue.Substring(infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue.IndexOf("i") + 1)) / 2
+                                    ElseIf infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue.Contains("p") Then
+                                        Return Integer.Parse(infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue.Substring(infoDoc.selectSingleNode("channel").selectSingleNode("video-mode").nodeTypedValue.IndexOf("p") + 1))
+                                    End If
+                            End Select
+                        End If
+                    End If
+                Else
+                    logger.err("ServerController.getChannelFPS: Could not get channel fps. Error in server response: " & infoDoc.parseError.reason & " @" & vbNewLine & result.getServerMessage)
                 End If
+            Else
+                logger.err("ServerController.getChannelFPS: Could not get channel fps for channel " & channel & ". Channel does not exist.")
             End If
-        Else
-            logger.err("ServerController.getFPS: Could not get channel fps. Error in server response: " & infoDoc.parseError.reason & " @" & vbNewLine & result.getServerMessage)
         End If
-        Return 0
+        Return -1
     End Function
 
     Public Function getMediaInfo(ByRef media As CasparCGMedia) As String
-        If media.getMediaType = CasparCGMedia.MediaType.TEMPLATE Then
-            Dim response = testConnection.sendCommand(CasparCGCommandFactory.getInfo(media))
-            If response.isOK Then
-                Return response.getXMLData
-            Else
-                logger.err("ServerController.getMediaInfo: Error loading xml data received from server for " & media.toString)
-                logger.err("ServerController.getMediaInfo: ServerMessage dump: " & response.getServerMessage)
-            End If
-        Else
-            Dim layer = getFreeLayer(testChannel)
-            Dim response = testConnection.sendCommand(CasparCGCommandFactory.getLoadbg(testChannel, layer, media.getFullName))
-            If response.isOK Then
-                Dim infoDoc As New MSXML2.DOMDocument
-                response = testConnection.sendCommand(CasparCGCommandFactory.getInfo(testChannel, layer, True))
-                testConnection.sendCommand(CasparCGCommandFactory.getClear(testChannel, layer))
-                If infoDoc.loadXML(response.getXMLData()) AndAlso Not IsNothing(infoDoc.selectSingleNode("producer").selectSingleNode("destination")) Then
-                    If infoDoc.selectSingleNode("producer").selectSingleNode("destination").selectSingleNode("producer").selectSingleNode("type").nodeTypedValue.Equals("separated-producer") Then
-                        Return infoDoc.selectSingleNode("producer").selectSingleNode("destination").selectSingleNode("producer").selectSingleNode("fill").selectSingleNode("producer").xml
-                    Else
-                        Return infoDoc.selectSingleNode("producer").selectSingleNode("destination").selectSingleNode("producer").xml
-                    End If
+        If isConnected() Then
+            If media.getMediaType = CasparCGMedia.MediaType.TEMPLATE Then
+                Dim response = testConnection.sendCommand(CasparCGCommandFactory.getInfo(media))
+                If response.isOK Then
+                    Return response.getXMLData
                 Else
-                    logger.err("ServerController.getMediaInfo: Error loading xml data received from server for " & media.toString & ". Error: " & infoDoc.parseError.reason)
-                    logger.err("ServerController.getMediaInfo: ServerMessages dump: " & response.getServerMessage)
+                    logger.err("ServerController.getMediaInfo: Error loading xml data received from server for " & media.toString)
+                    logger.err("ServerController.getMediaInfo: ServerMessage dump: " & response.getServerMessage)
                 End If
             Else
-                logger.err("ServerController.getMediaInfo: Error getting media information. Server messages was: " & response.getServerMessage)
+                Dim layer = getFreeLayer(testChannel)
+                Dim response = testConnection.sendCommand(CasparCGCommandFactory.getLoadbg(testChannel, layer, media.getFullName))
+                If response.isOK Then
+                    Dim infoDoc As New MSXML2.DOMDocument
+                    response = testConnection.sendCommand(CasparCGCommandFactory.getInfo(testChannel, layer, True))
+                    testConnection.sendCommand(CasparCGCommandFactory.getClear(testChannel, layer))
+                    If infoDoc.loadXML(response.getXMLData()) AndAlso Not IsNothing(infoDoc.selectSingleNode("producer").selectSingleNode("destination")) Then
+                        If infoDoc.selectSingleNode("producer").selectSingleNode("destination").selectSingleNode("producer").selectSingleNode("type").nodeTypedValue.Equals("separated-producer") Then
+                            Return infoDoc.selectSingleNode("producer").selectSingleNode("destination").selectSingleNode("producer").selectSingleNode("fill").selectSingleNode("producer").xml
+                        Else
+                            Return infoDoc.selectSingleNode("producer").selectSingleNode("destination").selectSingleNode("producer").xml
+                        End If
+                    Else
+                        logger.err("ServerController.getMediaInfo: Error loading xml data received from server for " & media.toString & ". Error: " & infoDoc.parseError.reason)
+                        logger.err("ServerController.getMediaInfo: ServerMessages dump: " & response.getServerMessage)
+                    End If
+                Else
+                    logger.err("ServerController.getMediaInfo: Error getting media information. Server messages was: " & response.getServerMessage)
+                End If
             End If
         End If
         Return ""
@@ -302,49 +360,47 @@ Public Class ServerController
     ''' </summary>
     ''' <returns></returns>
     ''' <remarks></remarks>
-    Public Function getMediaList(Optional ByVal withMediaInfo As Boolean = True) As Dictionary(Of String, CasparCGMedia)
+    Public Function getMediaList() As Dictionary(Of String, CasparCGMedia)
         Dim media As New Dictionary(Of String, CasparCGMedia)
         '' Catch the media list and create the media objects
-        Dim response = testConnection.sendCommand(CasparCGCommandFactory.getCls)
-        If response.isOK Then
-            For Each line As String In response.getData.Split(vbCrLf)
-                line = line.Trim()
-                If line <> "" AndAlso line.Split(" ").Length > 2 Then
-                    Dim name = line.Substring(1, line.LastIndexOf("""") - 1).ToUpper
-                    line = line.Remove(0, line.LastIndexOf("""") + 1)
-                    line = line.Trim().Replace("""", "").Replace("  ", " ")
-                    Dim values() = line.Split(" ")
-                    Select Case values(0)
-                        Case "MOVIE"
-                            media.Add(name, New CasparCGMovie(name))
-                        Case "AUDIO"
-                            media.Add(name, New CasparCGAudio(name))
-                        Case "STILL"
-                            media.Add(name, New CasparCGStill(name))
-                    End Select
-                End If
-            Next
-        End If
+        If isConnected() Then
+            Dim response = testConnection.sendCommand(CasparCGCommandFactory.getCls)
+            If response.isOK Then
+                For Each line As String In response.getData.Split(vbCrLf)
+                    line = line.Trim()
+                    If line <> "" AndAlso line.Split(" ").Length > 2 Then
+                        Dim name = line.Substring(1, line.LastIndexOf("""") - 1).ToUpper
+                        line = line.Remove(0, line.LastIndexOf("""") + 1)
+                        line = line.Trim().Replace("""", "").Replace("  ", " ")
+                        Dim values() = line.Split(" ")
+                        Select Case values(0)
+                            Case "MOVIE"
+                                media.Add(name, New CasparCGMovie(name))
+                                media.Item(name).setInfo("Duration", getTimeStringOfMS(getOriginalMediaDuration(media.Item(name))))
+                            Case "AUDIO"
+                                media.Add(name, New CasparCGAudio(name))
+                                'media.Item(name).setInfo("Duration", getTimeStringOfMS(getOriginalMediaDuration(media.Item(name))))
+                            Case "STILL"
+                                media.Add(name, New CasparCGStill(name))
+                        End Select
+                        media.Item(name).parseXML(getMediaInfo(media.Item(name)))
+                    End If
+                Next
+            End If
 
-        '' Catch the template list and create the template objects
-        response = testConnection.sendCommand(CasparCGCommandFactory.getTls)
-        If response.isOK Then
-            For Each line As String In response.getData.Split(vbCrLf)
-                line = line.Trim.Replace(vbCr, "").Replace(vbLf, "")
-                If line <> "" AndAlso line.Split(" ").Length > 2 Then
-                    Dim name = line.Substring(1, line.LastIndexOf("""") - 1).ToUpper
-                    media.Add(name, New CasparCGTemplate(name))
-                End If
-            Next
+            '' Catch the template list and create the template objects
+            response = testConnection.sendCommand(CasparCGCommandFactory.getTls)
+            If response.isOK Then
+                For Each line As String In response.getData.Split(vbCrLf)
+                    line = line.Trim.Replace(vbCr, "").Replace(vbLf, "")
+                    If line <> "" AndAlso line.Split(" ").Length > 2 Then
+                        Dim name = line.Substring(1, line.LastIndexOf("""") - 1).ToUpper
+                        media.Add(name, New CasparCGTemplate(name))
+                        media.Item(name).parseXML(getMediaInfo(media.Item(name)))
+                    End If
+                Next
+            End If
         End If
-
-        '' Add mediaInfo if requested
-        If withMediaInfo Then
-            For Each item In media.Values
-                item.parseXML(getMediaInfo(item))
-            Next
-        End If
-
         Return media
     End Function
 
@@ -451,58 +507,63 @@ Public Class FrameTicker
         Dim infoDoc As New MSXML2.DOMDocument
         Dim frame As Long = 0
         Dim ch = 0
-        timer.Start()
-        offsetTimer.Start()
-        While True
-            ' Alle channels durchgehen
-            For channel As Integer = 1 To channels
-                ch = channel - 1
-                'werte einlesen
-                offsetTimer.Restart()
-                infoDoc.loadXML(con.sendCommand(CasparCGCommandFactory.getInfo(channel, Integer.MaxValue)).getXMLData)
-                frame = infoDoc.firstChild.selectSingleNode("frame-number").nodeTypedValue + (offsetTimer.ElapsedMilliseconds / 2 / channelFameTime(ch))
-                offsetTimer.Stop()
+        Try
+            timer.Start()
+            offsetTimer.Start()
+            While True
+                ' Alle channels durchgehen
+                For channel As Integer = 1 To channels
+                    ch = channel - 1
+                    'werte einlesen
+                    offsetTimer.Restart()
+                    infoDoc.loadXML(con.sendCommand(CasparCGCommandFactory.getInfo(channel, Integer.MaxValue)).getXMLData)
+                    frame = infoDoc.firstChild.selectSingleNode("frame-number").nodeTypedValue + (offsetTimer.ElapsedMilliseconds / 2 / channelFameTime(ch))
+                    offsetTimer.Stop()
 
-                ' Korrigierten Wert für die Frame number berechen aus dem rückgabewert des servers + der frames die in der bearbeitungszeit
-                ' vermeintlich vergangen sind. Wir gehen vereinfacht davon aus, das die hälfte der Zeit für den Rückweg 
-                ' vom Server zu uns gebaucht wurde da wir das nicht genau messen können.
-                If frame <> channelFrame.Item(channel) Then
-                    channelFrame.Item(channel) = frame
-                End If
-            Next
-            ' Event auslösen
-            RaiseEvent frameTick(Me, New frameTickEventArgs(channelFrame))
-            logger.debug("FrameTicker.tick: Raise frameTick()")
-
-            ' Jetzt ein paar frames nur rechnen und dann wieder mit dem Serverwert vergleichen
-            Dim hasChanged = False
-            interpolatingSince = timer.ElapsedMilliseconds
-            While timer.ElapsedMilliseconds - interpolatingSince < interpolationTime
-                iterationStart = timer.ElapsedMilliseconds
-                For channel As Integer = 0 To channels - 1
-                    ' Interpoliere frames indem wir die vergange zeit der der letzen aktualisierung betrachten.
-                    ' Ist sie größer als die frameTime müssen wir die frame ändern.
-                    If iterationStart - channelLastUpdate(channel) >= channelFameTime(channel) Then
-                        hasChanged = True
-                        channelFrame.Item(channel + 1) = channelFrame.Item(channel + 1) + ((iterationStart - channelLastUpdate(channel)) / channelFameTime(channel))
-                        channelLastUpdate(channel) = iterationStart
+                    ' Korrigierten Wert für die Frame number berechen aus dem rückgabewert des servers + der frames die in der bearbeitungszeit
+                    ' vermeintlich vergangen sind. Wir gehen vereinfacht davon aus, das die hälfte der Zeit für den Rückweg 
+                    ' vom Server zu uns gebaucht wurde da wir das nicht genau messen können.
+                    If frame <> channelFrame.Item(channel) Then
+                        channelFrame.Item(channel) = frame
                     End If
                 Next
-                '' Event auslösen
-                If hasChanged Then
-                    RaiseEvent frameTick(Me, New frameTickEventArgs(channelFrame))
-                    logger.debug("FrameTicker.tick: Raise frameTick()")
-                End If
-                hasChanged = False
+                ' Event auslösen
+                RaiseEvent frameTick(Me, New frameTickEventArgs(channelFrame))
+                logger.debug("FrameTicker.tick: Raise frameTick()")
 
-                ' Jetzt noch ein bisschen warten um die cpu zu entlasten. Mindestens bis die nächste frame möglich ist
-                ' oder soviele Frames wie im frameInterval angegeben
-                iterationEnd = timer.ElapsedMilliseconds
-                If iterationEnd - iterationStart < (minFrameTime * frameInterval) Then
-                    Thread.Sleep((minFrameTime * frameInterval) - (iterationEnd - iterationStart))
-                End If
+                ' Jetzt ein paar frames nur rechnen und dann wieder mit dem Serverwert vergleichen
+                Dim hasChanged = False
+                interpolatingSince = timer.ElapsedMilliseconds
+                While timer.ElapsedMilliseconds - interpolatingSince < interpolationTime
+                    iterationStart = timer.ElapsedMilliseconds
+                    For channel As Integer = 0 To channels - 1
+                        ' Interpoliere frames indem wir die vergange zeit der der letzen aktualisierung betrachten.
+                        ' Ist sie größer als die frameTime müssen wir die frame ändern.
+                        If iterationStart - channelLastUpdate(channel) >= channelFameTime(channel) Then
+                            hasChanged = True
+                            channelFrame.Item(channel + 1) = channelFrame.Item(channel + 1) + ((iterationStart - channelLastUpdate(channel)) / channelFameTime(channel))
+                            channelLastUpdate(channel) = iterationStart
+                        End If
+                    Next
+                    '' Event auslösen
+                    If hasChanged Then
+                        RaiseEvent frameTick(Me, New frameTickEventArgs(channelFrame))
+                        logger.debug("FrameTicker.tick: Raise frameTick()")
+                    End If
+                    hasChanged = False
+
+                    ' Jetzt noch ein bisschen warten um die cpu zu entlasten. Mindestens bis die nächste frame möglich ist
+                    ' oder soviele Frames wie im frameInterval angegeben
+                    iterationEnd = timer.ElapsedMilliseconds
+                    If iterationEnd - iterationStart < (minFrameTime * frameInterval) Then
+                        While timer.ElapsedMilliseconds < iterationEnd + (minFrameTime * frameInterval) - (iterationEnd - iterationStart)
+                            'Thread.Sleep((minFrameTime * frameInterval) - (iterationEnd - iterationStart))
+                        End While
+                    End If
+                End While
             End While
-        End While
+        Catch e As ThreadInterruptedException
+        End Try
     End Sub
 End Class
 
@@ -572,9 +633,7 @@ Public Class mediaUpdater
         ' Damit nicht zu viele updates gleichzeitig laufen, 
         ' muss jedes update exlusiv updaten. Kann es das in einer milliseconde
         ' nicht erreichen, verwirft es das update für diesen Tick
-        'logger.warn("mediaUpdater.updateMedia: Got tick")
-        If controller.readyForUpdate.WaitOne(1) Then
-            'logger.warn("mediaUpdater.updateMedia: Got tick and handle")
+        If controller.readyForUpdate.WaitOne(1) AndAlso controller.isOpen Then
             '' Listen und variablen vorbereiten
             xml = ""
             mediaName = ""
@@ -623,7 +682,7 @@ Public Class mediaUpdater
                                     mediaName = foregroundProducer.selectSingleNode("filename").nodeTypedValue
                                     '' CASPARCG BUG WORKAROUND für doppelte // bei image-producern
                                     mediaName = mediaName.Replace("\\", "\")
-                                    mediaName = mediaName.Substring(mediaName.IndexOf("\") + 1, mediaName.LastIndexOf(".") - (mediaName.IndexOf("\") + 1)).ToUpper
+                                    mediaName = mediaName.Substring(mediaName.LastIndexOf("\") + 1, mediaName.LastIndexOf(".") - (mediaName.LastIndexOf("\") + 1)).ToUpper
                                 End If
                                 xml = foregroundProducer.xml
                                 If activeItems(c).Item(layer).ContainsKey(mediaName) Then
@@ -640,6 +699,13 @@ Public Class mediaUpdater
                     ' und werden daher als gestoppt markiert
                     For Each layer As Integer In activeItems(c).Keys
                         For Each item As IPlaylistItem In activeItems(c).Item(layer).Values
+
+                            '' BUGFIX CasparCG won't ever reach nb-frames with frame-number, so we fake it till this is fixed
+                            If item.getMedia.containsInfo("nb-frames") AndAlso item.getMedia.containsInfo("frame-number") Then
+                                If Long.Parse(item.getMedia.getInfo("nb-frames")) > Long.Parse(item.getMedia.getInfo("frame-number")) Then
+                                    item.getMedia.setInfo("frame-number", item.getMedia.getInfo("nb-frames"))
+                                End If
+                            End If
                             item.stoppedPlaying()
                         Next
                     Next
