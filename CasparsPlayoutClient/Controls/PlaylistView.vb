@@ -23,7 +23,7 @@ Public Class PlaylistView
     Private playlist As IPlaylistItem
     Private childs As List(Of PlaylistView)
     Private startCompact As Boolean
-    Private waiting As Boolean = False
+    'Private waiting As Boolean = False
     Private Delegate Sub updateDelegate()
     Private cMenu As ContextMenuStrip
     Private noWarn As Integer = 5000
@@ -60,7 +60,7 @@ Public Class PlaylistView
 
         init()
         initMenu()
-        AddHandler playlist.waitForNext, AddressOf waitForNext
+        'AddHandler playlist.waitForNext, AddressOf waitForNext
     End Sub
 
     Private Sub init()
@@ -142,16 +142,17 @@ Public Class PlaylistView
 
     Public Sub onDataChanged() Handles Me.dataChanged
         If Me.InvokeRequired Then
-            Dim d As New updateDelegate(AddressOf Me.setData)
+            Dim d As New updateDelegate(AddressOf Me.onDataChanged)
             Me.Invoke(d)
         Else
             setData()
+            updateItems.WaitOne()
+            For Each child In childs
+                child.onDataChanged()
+            Next
+            updateItems.Release()
         End If
-        updateItems.WaitOne()
-        For Each child In childs
-            child.onDataChanged()
-        Next
-        updateItems.Release()
+
     End Sub
 
     Private Sub setData()
@@ -174,7 +175,7 @@ Public Class PlaylistView
                     Case Else
                         txtRemaining.BackColor = Color.White
                 End Select
-                Me.txtDelay.Text = .getDelay
+                If Not txtDelay.Focused Then Me.txtDelay.Text = .getDelay
                 Me.ckbAuto.Checked = .isAutoStarting
                 Me.ckbParallel.Checked = .isParallel
                 Me.ckbLoop.Checked = .isLooping
@@ -230,14 +231,11 @@ Public Class PlaylistView
     Private Sub cmbToggleButton_Click(ByVal sender As System.Object, ByVal e As EventArgs) Handles cmbToggleButton.Click
         If ModifierKeys = Keys.Control Then
             logger.debug("GUI PlaylistView: HardStop requested at " & Me.txtName.Text)
-            'waiting = False
             playlist.abort()
         ElseIf playlist.isWaiting Then
-            'waiting = False
             playlist.playNextItem()
         ElseIf playlist.isPlaying Then
             playlist.halt()
-            'playlist.stoppedPlaying()
         Else
             ' Damit nicht gewartet wird falls der button manuel betätigt wurde aber auto nicht gesetzt ist
             If playlist.getControler.containsChannel(playlist.getChannel) OrElse Not playlist.isPlayable Then
@@ -284,11 +282,11 @@ Public Class PlaylistView
             txtName.ReadOnly = False
         End If
         '' Hier kommt es immer wieder zum Deadlock und ich weiß nicht wieso!
-        updateItems.WaitOne()
-        For Each child In childs
-            child.onChangedPlayingState()
-        Next
-        updateItems.Release()
+        'updateItems.WaitOne()
+        'For Each child In childs
+        '    child.onChangedPlayingState()
+        'Next
+        'updateItems.Release()
 
     End Sub
 
@@ -335,16 +333,16 @@ Public Class PlaylistView
     End Sub
 
     Private Sub txtDelay_Leave(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles txtDelay.Leave
-        playlist.setDelay(TimeSpan.Parse(txtDelay.Text).TotalMilliseconds)
+        playlist.setDelay(Long.Parse(txtDelay.Text))
     End Sub
 
     Private Sub txtName_Leave(ByVal sender As Object, ByVal e As System.EventArgs) Handles txtName.Leave
         playlist.setName(txtName.Text)
     End Sub
 
-    Private Sub waitForNext()
-        waiting = True
-    End Sub
+    'Private Sub waitForNext()
+    '    waiting = True
+    'End Sub
 
 
     ''
@@ -423,19 +421,26 @@ Public Class PlaylistView
             '' PlaylistItems verschieben
             ''
             Dim item As PlaylistView = e.Data.GetData("CasparsPlayoutClient.PlaylistView")
-            If Not IsNothing(item.playlist.getParent) Then
-                ' Playlist von seiner alten liste lösen
-                item.playlist.getParent.removeChild(item.playlist)
-                If Not IsNothing(playlist.getParent) Then
-                    ' und an den platz dieser Playlist in dem Vater einfügen
-                    playlist.getParent.insertChildAt(item.playlist, playlist)
-                    'jetzt noch die Controls entsprechend verschieben.
-                    item.Parent = Me.Parent
-                    Me.Parent.Controls.SetChildIndex(item, Me.Parent.Controls.GetChildIndex(Me))
+            If IsNothing(item.playlist.getParent) Then
+                logger.warn("Playlist " + item.playlist.getName + " has no parent assigned.")
+            Else
+                If item.Equals(Me) Then
+                    logger.warn("Playlist " + item.playlist.getName + " Can't move or add me to myself.")
                 Else
-                    ' oder, wenn es auf den Freiraum der neuen liste 
-                    playlist.addItem(item.playlist)
-                    item.Parent = Me.layoutChild
+                    ' Playlist von seiner alten liste lösen
+                    item.playlist.getParent.removeChild(item.playlist)
+
+                    If IsNothing(playlist.getParent) OrElse ModifierKeys = Keys.Control Then
+                        ' oder, wenn es auf den Freiraum der neuen liste 
+                        playlist.addItem(item.playlist)
+                        item.Parent = Me.layoutChild
+                    Else
+                        ' und an den platz dieser Playlist in dem Vater einfügen
+                        playlist.getParent.insertChildAt(item.playlist, playlist)
+                        'jetzt noch die Controls entsprechend verschieben.
+                        item.Parent = Me.Parent
+                        Me.Parent.Controls.SetChildIndex(item, Me.Parent.Controls.GetChildIndex(Me))
+                    End If
                 End If
             End If
         End If
@@ -447,7 +452,15 @@ Public Class PlaylistView
             ' Display the copy cursor. 
             e.Effect = DragDropEffects.Copy
         ElseIf e.Data.GetDataPresent("CasparsPlayoutClient.PlaylistView") Then
-            e.Effect = DragDropEffects.Move
+            If ModifierKeys = Keys.Control Then
+                If playlist.getItemType = AbstractPlaylistItem.PlaylistItemTypes.BLOCK Then
+                    e.Effect = DragDropEffects.Copy
+                Else
+                    e.Effect = DragDropEffects.None
+                End If
+            Else
+                e.Effect = DragDropEffects.Move
+            End If
         Else
             ' Display the no-drop cursor. 
             e.Effect = DragDropEffects.None
@@ -462,7 +475,12 @@ Public Class PlaylistView
     Private Sub handleMouseMove(ByVal sender As Object, ByVal e As MouseEventArgs) Handles MyBase.MouseMove, layoutButton.MouseMove, layoutContentSplit.MouseMove, layoutInfos.MouseMove, layoutName.MouseMove, layoutHeaderTable.MouseMove
         If MouseIsDown Then
             ' Initiate dragging. 
-            DoDragDrop(Me, DragDropEffects.Move)
+            If ModifierKeys = Keys.Control Then
+                DoDragDrop(Me, DragDropEffects.Copy)
+            Else
+                DoDragDrop(Me, DragDropEffects.Move)
+            End If
+
         End If
         MouseIsDown = False
     End Sub

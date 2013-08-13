@@ -308,29 +308,6 @@ Public MustInherit Class AbstractPlaylistItem
         'RaiseEvent changed 
     End Sub
 
-    Public Sub addItem(ByRef item As IPlaylistItem) Implements IPlaylistItem.addItem
-        logger.log("PlaylistItem.addItem: " & getName() & "(" & getChannel() & "-" & getLayer() & "): Adding new Item " & item.getName)
-        If Not IsNothing(item) Then
-            If item.getChannel < 0 Then
-                item.setChannel(getChannel)
-            End If
-            If item.getLayer < 0 Then
-                item.setLayer(getLayer)
-            End If
-
-            item.setParent(Me)
-            updateItems.WaitOne()
-            items.Add(item)
-            updateItems.Release()
-            If isParallel() Then
-                setDuration(Math.Max(getDuration, item.getDuration))
-            Else
-                setDuration(getDuration() + item.getDuration)
-            End If
-            RaiseEvent changed(Me)
-        End If
-    End Sub
-
     Public Sub setAutoStart(ByVal autoStart As Boolean) Implements IPlaylistItem.setAutoStart
         If autoStart <> isAutoStarting() Then
             Me.autoStart = autoStart
@@ -382,18 +359,47 @@ Public MustInherit Class AbstractPlaylistItem
 
     Public Sub removeChild(ByRef child As IPlaylistItem) Implements IPlaylistItem.removeChild
         If items.Contains(child) Then
+            logger.log("Playlist " + getName() + ": Remove " + child.getName)
             updateItems.WaitOne()
             items.Remove(child)
             updateItems.Release()
+            child.setParent(Nothing)
             RaiseEvent changed(Me)
+        Else
+            logger.warn("Playlist " + getName() + ": Can't remove " + child.getName + ". No such child playlist found.")
         End If
     End Sub
 
     Public Sub insertChildAt(ByRef child As IPlaylistItem, ByRef position As IPlaylistItem) Implements IPlaylistItem.insertChildAt
         If items.Contains(position) Then
+            logger.log("Playlist " + getName() + ": Insert item " + child.getName + " at position of " + position.getName)
             updateItems.WaitOne()
             items.Insert(items.IndexOf(position), child)
             updateItems.Release()
+            child.setParent(Me)
+            RaiseEvent changed(Me)
+        End If
+    End Sub
+
+    Public Sub addItem(ByRef item As IPlaylistItem) Implements IPlaylistItem.addItem
+        logger.log("PlaylistItem.addItem: " & getName() & "(" & getChannel() & "-" & getLayer() & "): Adding new Item " & item.getName)
+        If Not IsNothing(item) Then
+            If item.getChannel < 0 Then
+                item.setChannel(getChannel)
+            End If
+            If item.getLayer < 0 Then
+                item.setLayer(getLayer)
+            End If
+
+            item.setParent(Me)
+            updateItems.WaitOne()
+            items.Add(item)
+            updateItems.Release()
+            If isParallel() Then
+                setDuration(Math.Max(getDuration, item.getDuration))
+            Else
+                setDuration(getDuration() + item.getDuration)
+            End If
             RaiseEvent changed(Me)
         End If
     End Sub

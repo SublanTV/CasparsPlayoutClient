@@ -22,6 +22,7 @@ Public Class PlaylistMovieItem
     Implements IPlaylistItem
 
     Private media As CasparCGMovie
+    Private timer As System.Timers.Timer
 
     ''' <summary>
     ''' Create a PlaylistMovieItem. If a duration is given and smaller than the original duration of the file, the file will only be played for that long.
@@ -41,6 +42,9 @@ Public Class PlaylistMovieItem
                 setDuration(getControler.getMediaDuration(movie, channel))
             End If
             media = movie
+            timer = New Timers.Timer()
+            timer.Enabled = False
+            AddHandler timer.Elapsed, Sub() playNextItem()
         Else
             logger.critical("PlaylistMovieItem.new: ERROR: Given movie was nothing - Stopping now")
             Throw New Exception("NOTHING not allowed")
@@ -67,30 +71,36 @@ Public Class PlaylistMovieItem
         '' CMD an ServerController schicken
         logger.log("PlaylistMovieItem.start: Starte " & getChannel() & "-" & getLayer() & ": " & getMedia.toString)
 
-        If getControler.containsChannel(getChannel) AndAlso getLayer() > -1 Then
-            Dim cmd As ICommand = New PlayCommand(getChannel, getLayer, getMedia, isLooping, False)
-
-            'Dim result = getController.getCommandConnection.sendCommand(CasparCGCommandFactory.getPlay(getChannel, getLayer, getMedia, isLooping, False))
-            If cmd.execute(getControler.getCommandConnection).isOK Then
-                raiseStarted(Me)
-                While Not getControler.readyForUpdate.WaitOne()
-                    logger.warn("PlaylistMovieItem.start: " & getName() & ": Could not get handle to update my status")
-                End While
-                playing = True
-                getControler.readyForUpdate.Release()
-                ' InfoMediaUpdater needs an empty to detect end of file due to BUG: frame-number never reaches nb-frames
-                If Not getControler.getCommandConnection.isOSCSupported() Then
-                    cmd = New LoadbgCommand(getChannel, getLayer, "empty", True)
-                    cmd.execute(getControler.getCommandConnection)
-                End If
-                logger.log("PlaylistMovieItem.start: ...gestartet " & getChannel() & "-" & getLayer() & ": " & getMedia.toString)
-            Else
-                playing = False
-                raiseCanceled(Me)
-                logger.err("PlaylistMovieItem.start: Could not start " & media.getFullName & ". ServerMessage was: " & cmd.getResponse.getServerMessage)
-            End If
+        If getDelay() > 0 AndAlso timer.Enabled = False Then
+            timer.Interval = getDelay()
+            timer.Enabled = True
         Else
-            logger.err("PlaylistMovieItem.start: Error playing " & getName() & ". The channel " & getChannel() & " does not exist on the server. Aborting start.")
+            timer.Enabled = False
+            If getControler.containsChannel(getChannel) AndAlso getLayer() > -1 Then
+                Dim cmd As ICommand = New PlayCommand(getChannel, getLayer, getMedia, isLooping, False)
+
+                'Dim result = getController.getCommandConnection.sendCommand(CasparCGCommandFactory.getPlay(getChannel, getLayer, getMedia, isLooping, False))
+                If cmd.execute(getControler.getCommandConnection).isOK Then
+                    raiseStarted(Me)
+                    While Not getControler.readyForUpdate.WaitOne()
+                        logger.warn("PlaylistMovieItem.start: " & getName() & ": Could not get handle to update my status")
+                    End While
+                    playing = True
+                    getControler.readyForUpdate.Release()
+                    ' InfoMediaUpdater needs an empty to detect end of file due to BUG: frame-number never reaches nb-frames
+                    If Not getControler.getCommandConnection.isOSCSupported() Then
+                        cmd = New LoadbgCommand(getChannel, getLayer, "empty", True)
+                        cmd.execute(getControler.getCommandConnection)
+                    End If
+                    logger.log("PlaylistMovieItem.start: ...gestartet " & getChannel() & "-" & getLayer() & ": " & getMedia.toString)
+                Else
+                    playing = False
+                    raiseCanceled(Me)
+                    logger.err("PlaylistMovieItem.start: Could not start " & media.getFullName & ". ServerMessage was: " & cmd.getResponse.getServerMessage)
+                End If
+            Else
+                logger.err("PlaylistMovieItem.start: Error playing " & getName() & ". The channel " & getChannel() & " does not exist on the server. Aborting start.")
+            End If
         End If
     End Sub
 
@@ -113,6 +123,7 @@ Public Class PlaylistMovieItem
 
     Public Overrides Sub stoppedPlaying()
         playing = False
+        setPosition(0)
         raiseStopped(Me)
     End Sub
 

@@ -26,7 +26,7 @@ Public Class MainWindow
     Delegate Sub updateDelegate()
 
     Private Sub MainWindow_Load(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles MyBase.Load
-        logger.addLogAction(New consoleLogger(3))
+        'logger.addLogAction(New consoleLogger(3))
         'logger.addLogAction(New fileLogger(3, "c:\daten\cpc2.log", True, False))
         sc = New ServerControler
         mediaLib = New Library(sc)

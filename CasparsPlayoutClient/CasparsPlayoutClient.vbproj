@@ -119,9 +119,6 @@
     <Reference Include="System.Xml" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
-    <Reference Include="Ventuz.OSC">
-      <HintPath>..\libs\Ventuz.OSC\Ventuz.OSC.dll</HintPath>
-    </Reference>
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>

@@ -95,10 +95,12 @@ Public Class ServerControler
             opened = True
             ' Channels des Servers bestimmen
             channels = testConnection.getServerChannels
-            If channels = testChannel - 1 Then
+            testChannel = channels
+            If channels > 1 Then
                 channels = channels - 1
             End If
-            ReDim channelFPS(channels - 1)
+            '' Test: removed -1 because the number should be the length, not the upper bound of the array
+            ReDim channelFPS(channels)
             For c As Integer = 0 To channels - 1
                 channelFPS(c) = getChannelFPS(c + 1)
             Next

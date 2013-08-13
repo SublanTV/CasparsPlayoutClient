@@ -145,12 +145,13 @@ Public Class PlaylistBlockItem
             ' calculate the next item
             '' LOCK the items list while doing this!!
             updateItems.WaitOne()
-            Dim pos As Integer = getChildItems.IndexOf(lastPlayed)
-            If pos = getChildItems.Count - 1 Then
+            Dim childs = getChildItems()
+            Dim pos As Integer = childs.IndexOf(lastPlayed)
+            If pos = childs.Count - 1 Then
                 ' we played the last item. if loop, start again with first, else return nothing 
                 If isLooping() Then
                     updateItems.Release()
-                    Return getChildItems.First
+                    Return childs.First
                 Else
                     updateItems.Release()
                     Return Nothing
@@ -158,7 +159,7 @@ Public Class PlaylistBlockItem
             Else
                 ' not the end of the list, so return next
                 updateItems.Release()
-                Return getChildItems.Item(pos + 1)
+                Return childs.Item(pos + 1)
             End If
         ElseIf getChildItems.Count > 0 Then
             ' No current item, just play the first
