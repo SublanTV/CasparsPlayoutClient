@@ -24,16 +24,22 @@ Public Class PlaylistBlockItem
 
     Private playedItems As List(Of IPlaylistItem)
 
+    Private timer As System.Timers.Timer
+    Private stopWatch As New Stopwatch()
+
     Private updateItems As New Threading.Semaphore(1, 1)
 
 
     Public Sub New(ByVal name As String, ByRef controller As ServerControler, Optional ByVal channel As Integer = -1, Optional ByVal layer As Integer = -1)
         MyBase.New(name, PlaylistItemTypes.BLOCK, controller, channel, layer, 0)
         playedItems = New List(Of IPlaylistItem)
+        timer = New Timers.Timer()
+        timer.Enabled = False
+        AddHandler timer.Elapsed, Sub() playNextItem()
     End Sub
 
     Public Overrides Function isPlaying() As Boolean
-        If isWaiting() Then Return True
+        If isWaiting() AndAlso Not timer.Enabled Then Return True
         For Each child In getChildItems()
             If child.isPlaying OrElse child.isWaiting Then Return True
         Next
@@ -41,6 +47,8 @@ Public Class PlaylistBlockItem
     End Function
 
     Public Overrides Sub halt()
+        timer.Enabled = False
+        stopWatch.Stop()
         For Each item In getChildItems()
             If item.isPlaying Then RemoveHandler item.stopped, AddressOf itemStopped
             item.halt()
@@ -49,8 +57,9 @@ Public Class PlaylistBlockItem
     End Sub
 
     Public Overrides Sub abort()
+        timer.Enabled = False
+        stopWatch.Stop()
         waiting = False
-        'playNext = False
         playing = False
         setPosition(0)
         playedItems.Clear()
@@ -92,23 +101,41 @@ Public Class PlaylistBlockItem
     End Sub
 
     Public Overrides Sub playNextItem(Optional ByRef lastPlayed As IPlaylistItem = Nothing)
-        waiting = False
-        If isParallel() Then
-            'Stat all subitems
-            For Each item In getChildItems()
-                AddHandler item.stopped, AddressOf itemStopped
-                item.start()
-            Next
+
+        ' Check if we need to start delayed
+        If getDelay() > 0 AndAlso timer.Enabled = False AndAlso IsNothing(lastPlayed) Then
+            stopWatch.Reset()
+            timer.Interval = getDelay()
+            timer.Enabled = True
+            stopWatch.Start()
+            waiting = True
+            raiseWaitForNext(Me)
         Else
-            ' only start the next subitem
-            Dim nextItem As IPlaylistItem = getNextToPlay(lastPlayed)
-            If Not IsNothing(nextItem) AndAlso Not nextItem.isPlaying Then
-                AddHandler nextItem.stopped, AddressOf itemStopped
-                AddHandler nextItem.aborted, AddressOf itemStopped
-                AddHandler nextItem.canceled, AddressOf itemCanceled
-                'AddHandler nextItem.started, AddressOf itemStarted
-                nextItem.start()
-            Else : stoppedPlaying()
+            stopWatch.Stop()
+            timer.Enabled = False
+            stopWatch.Reset()
+            waiting = False
+            playing = True
+
+            waiting = False
+            If isParallel() Then
+                'Stat all subitems
+                For Each item In getChildItems()
+                    AddHandler item.stopped, AddressOf itemStopped
+                    item.start()
+                Next
+            Else
+                ' only start the next subitem
+                Dim nextItem As IPlaylistItem = getNextToPlay(lastPlayed)
+                If Not IsNothing(nextItem) AndAlso Not nextItem.isPlaying Then
+                    AddHandler nextItem.stopped, AddressOf itemStopped
+                    AddHandler nextItem.aborted, AddressOf itemStopped
+                    AddHandler nextItem.canceled, AddressOf itemCanceled
+                    nextItem.start()
+                ElseIf isLooping() Then
+                    start()
+                Else : stoppedPlaying()
+                End If
             End If
         End If
     End Sub
@@ -135,7 +162,7 @@ Public Class PlaylistBlockItem
     End Sub
 
     Private Sub itemCanceled(ByRef sender As IPlaylistItem)
-        ' if something unexpected happens, we schedule the next, but wait for the user to start it
+        ' if something unexpected happens, we schedule the next
         RemoveHandler sender.canceled, AddressOf itemCanceled
         playNextItem(sender)
     End Sub
@@ -148,14 +175,9 @@ Public Class PlaylistBlockItem
             Dim childs = getChildItems()
             Dim pos As Integer = childs.IndexOf(lastPlayed)
             If pos = childs.Count - 1 Then
-                ' we played the last item. if loop, start again with first, else return nothing 
-                If isLooping() Then
-                    updateItems.Release()
-                    Return childs.First
-                Else
-                    updateItems.Release()
-                    Return Nothing
-                End If
+                ' we played the last item so return nothing 
+                updateItems.Release()
+                Return Nothing
             Else
                 ' not the end of the list, so return next
                 updateItems.Release()
@@ -171,7 +193,10 @@ Public Class PlaylistBlockItem
     End Function
 
     Public Overrides Function getPosition() As Long
-        If IsNothing(getParent) OrElse getParent.isPlaying() OrElse isPlaying() Then
+
+        If timer.Enabled Then
+            Return stopWatch.ElapsedMilliseconds - timer.Interval
+        ElseIf IsNothing(getParent) OrElse getParent.isPlaying() OrElse isPlaying() Then
             Dim pos As Long
             For Each child In getChildItems()
                 If isParallel() Then

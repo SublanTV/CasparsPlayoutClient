@@ -21,13 +21,8 @@ Public Class PlaylistCommandItem
     Inherits AbstractPlaylistItem
     Implements IPlaylistItem
 
-    Public Shadows Event waitForNext(ByRef sender As IPlaylistItem)
-    Public Shadows Event aborted(ByRef sender As IPlaylistItem)
-    Public Shadows Event canceled(ByRef sender As IPlaylistItem)
-    Public Shadows Event changed(ByRef sender As IPlaylistItem)
-    Public Shadows Event paused(ByRef sender As IPlaylistItem)
-    Public Shadows Event started(ByRef sender As IPlaylistItem)
-    Public Shadows Event stopped(ByRef sender As IPlaylistItem)
+    Private timer As System.Timers.Timer
+    Private stopWatch As New Stopwatch()
 
     Private command As ICommand
 
@@ -37,11 +32,22 @@ Public Class PlaylistCommandItem
         Me.command = command
         setChannel(channel)
         setLayer(layer)
+        timer = New Timers.Timer()
+        timer.Enabled = False
+        AddHandler timer.Elapsed, Sub() playNextItem()
     End Sub
 
     Public Function getCommand() As ICommand
         Return command
     End Function
+
+    Public Overrides Sub abort()
+        timer.Enabled = False
+        stopWatch.Stop()
+        stopWatch.Reset()
+        waiting = False
+        playing = False
+    End Sub
 
     Public Overrides Sub start()
         ' Wait if autostart not checked
@@ -55,14 +61,29 @@ Public Class PlaylistCommandItem
 
     Public Overrides Sub playNextItem(Optional ByRef lastPlayed As IPlaylistItem = Nothing)
         ' Start in own thread to avoid long gaps in the playlist rundown
-        waiting = False
-        Dim t As New Threading.Thread(AddressOf execute)
-        playing = True
-        t.Start()
+        If getDelay() > 0 AndAlso timer.Enabled = False Then
+            stopWatch.Reset()
+            timer.Interval = getDelay()
+            timer.Enabled = True
+            stopWatch.Start()
+            waiting = True
+            raiseWaitForNext(Me)
+        Else
+            stopWatch.Stop()
+            timer.Enabled = False
+            stopWatch.Reset()
+            waiting = False
+            playing = True
+
+            Dim t As New Threading.Thread(AddressOf execute)
+            playing = True
+            t.Start()
+        End If
     End Sub
 
     Public Overrides Sub stoppedPlaying()
         playing = False
+        timer.Enabled = False
         raiseStopped(Me)
     End Sub
 
@@ -94,6 +115,14 @@ Public Class PlaylistCommandItem
         End If
     End Sub
 
+    Public Overrides Function getPosition() As Long
+        If timer.Enabled Then
+            Return stopWatch.ElapsedMilliseconds - timer.Interval
+        Else
+            Return MyBase.getPosition()
+        End If
+    End Function
+
 
     '' functions that have to be overriden because they shoudl have no effect at all
     Public Overloads Sub addItem(ByVal item As IPlaylistItem)
@@ -108,9 +137,7 @@ Public Class PlaylistCommandItem
     '' EMPTY MEMBERS
     ''---------------
 
-    ' Commands can't be halted, aborted, loaded or paused.
-    Public Overrides Sub abort()
-    End Sub
+    ' Commands can't be halted, loaded or paused.
 
     Public Overrides Sub halt()
     End Sub

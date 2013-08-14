@@ -86,7 +86,7 @@ Partial Class PlaylistView
         Me.layoutContentSplit.Panel2.AutoScroll = True
         Me.layoutContentSplit.Panel2.Controls.Add(Me.layoutChild)
         Me.layoutContentSplit.Panel2MinSize = 0
-        Me.layoutContentSplit.Size = New System.Drawing.Size(263, 81)
+        Me.layoutContentSplit.Size = New System.Drawing.Size(270, 81)
         Me.layoutContentSplit.SplitterDistance = 25
         Me.layoutContentSplit.TabIndex = 0
         '
@@ -166,7 +166,7 @@ Partial Class PlaylistView
         Me.layoutChild.Location = New System.Drawing.Point(0, 0)
         Me.layoutChild.Margin = New System.Windows.Forms.Padding(0)
         Me.layoutChild.Name = "layoutChild"
-        Me.layoutChild.Size = New System.Drawing.Size(234, 4)
+        Me.layoutChild.Size = New System.Drawing.Size(241, 4)
         Me.layoutChild.TabIndex = 6
         Me.layoutChild.WrapContents = False
         '
@@ -191,7 +191,7 @@ Partial Class PlaylistView
         Me.layoutHeaderTable.RowStyles.Add(New System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 25.0!))
         Me.layoutHeaderTable.RowStyles.Add(New System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100.0!))
         Me.layoutHeaderTable.RowStyles.Add(New System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30.0!))
-        Me.layoutHeaderTable.Size = New System.Drawing.Size(263, 65)
+        Me.layoutHeaderTable.Size = New System.Drawing.Size(270, 65)
         Me.layoutHeaderTable.TabIndex = 0
         '
         'lblExpand
@@ -231,7 +231,7 @@ Partial Class PlaylistView
         Me.pbPlayed.Location = New System.Drawing.Point(24, 25)
         Me.pbPlayed.Margin = New System.Windows.Forms.Padding(0)
         Me.pbPlayed.Name = "pbPlayed"
-        Me.pbPlayed.Size = New System.Drawing.Size(239, 10)
+        Me.pbPlayed.Size = New System.Drawing.Size(246, 10)
         Me.pbPlayed.Style = System.Windows.Forms.ProgressBarStyle.Continuous
         Me.pbPlayed.TabIndex = 11
         '
@@ -249,7 +249,7 @@ Partial Class PlaylistView
         Me.layoutInfos.Location = New System.Drawing.Point(24, 35)
         Me.layoutInfos.Margin = New System.Windows.Forms.Padding(0)
         Me.layoutInfos.Name = "layoutInfos"
-        Me.layoutInfos.Size = New System.Drawing.Size(239, 30)
+        Me.layoutInfos.Size = New System.Drawing.Size(246, 30)
         Me.layoutInfos.TabIndex = 12
         '
         'grbChannelLayer
@@ -275,8 +275,8 @@ Partial Class PlaylistView
         Me.grbDelay.Location = New System.Drawing.Point(0, 0)
         Me.grbDelay.Margin = New System.Windows.Forms.Padding(0)
         Me.grbDelay.Name = "grbDelay"
-        Me.grbDelay.Padding = New System.Windows.Forms.Padding(1)
-        Me.grbDelay.Size = New System.Drawing.Size(58, 35)
+        Me.grbDelay.Padding = New System.Windows.Forms.Padding(0)
+        Me.grbDelay.Size = New System.Drawing.Size(60, 35)
         Me.grbDelay.TabIndex = 9
         Me.grbDelay.TabStop = False
         Me.grbDelay.Text = "Delay"
@@ -284,13 +284,14 @@ Partial Class PlaylistView
         'txtDelay
         '
         Me.txtDelay.Dock = System.Windows.Forms.DockStyle.Fill
-        Me.txtDelay.Location = New System.Drawing.Point(1, 12)
+        Me.txtDelay.Location = New System.Drawing.Point(0, 11)
         Me.txtDelay.Margin = New System.Windows.Forms.Padding(0)
         Me.txtDelay.MaxLength = 11
         Me.txtDelay.Name = "txtDelay"
-        Me.txtDelay.Size = New System.Drawing.Size(56, 18)
+        Me.txtDelay.Size = New System.Drawing.Size(60, 18)
         Me.txtDelay.TabIndex = 0
         Me.txtDelay.Text = "00:00:00.00"
+        Me.txtDelay.TextAlign = System.Windows.Forms.HorizontalAlignment.Right
         Me.txtDelay.WordWrap = False
         '
         'grbDuration
@@ -300,11 +301,11 @@ Partial Class PlaylistView
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.grbDuration.Controls.Add(Me.txtDuration)
         Me.grbDuration.Font = New System.Drawing.Font("Microsoft Sans Serif", 6.75!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.grbDuration.Location = New System.Drawing.Point(58, 0)
+        Me.grbDuration.Location = New System.Drawing.Point(60, 0)
         Me.grbDuration.Margin = New System.Windows.Forms.Padding(0)
         Me.grbDuration.Name = "grbDuration"
-        Me.grbDuration.Padding = New System.Windows.Forms.Padding(1)
-        Me.grbDuration.Size = New System.Drawing.Size(58, 35)
+        Me.grbDuration.Padding = New System.Windows.Forms.Padding(0)
+        Me.grbDuration.Size = New System.Drawing.Size(60, 35)
         Me.grbDuration.TabIndex = 8
         Me.grbDuration.TabStop = False
         Me.grbDuration.Text = "Duration"
@@ -312,12 +313,13 @@ Partial Class PlaylistView
         'txtDuration
         '
         Me.txtDuration.Dock = System.Windows.Forms.DockStyle.Fill
-        Me.txtDuration.Location = New System.Drawing.Point(1, 12)
+        Me.txtDuration.Location = New System.Drawing.Point(0, 11)
         Me.txtDuration.Margin = New System.Windows.Forms.Padding(0)
         Me.txtDuration.Name = "txtDuration"
-        Me.txtDuration.Size = New System.Drawing.Size(56, 18)
+        Me.txtDuration.Size = New System.Drawing.Size(60, 18)
         Me.txtDuration.TabIndex = 0
-        Me.txtDuration.Text = "00:00:00.00"
+        Me.txtDuration.Text = "+00:00:00.00"
+        Me.txtDuration.TextAlign = System.Windows.Forms.HorizontalAlignment.Right
         Me.txtDuration.WordWrap = False
         '
         'grpPosition
@@ -327,11 +329,11 @@ Partial Class PlaylistView
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.grpPosition.Controls.Add(Me.txtPosition)
         Me.grpPosition.Font = New System.Drawing.Font("Microsoft Sans Serif", 6.75!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.grpPosition.Location = New System.Drawing.Point(116, 0)
+        Me.grpPosition.Location = New System.Drawing.Point(120, 0)
         Me.grpPosition.Margin = New System.Windows.Forms.Padding(0)
         Me.grpPosition.Name = "grpPosition"
-        Me.grpPosition.Padding = New System.Windows.Forms.Padding(1)
-        Me.grpPosition.Size = New System.Drawing.Size(58, 35)
+        Me.grpPosition.Padding = New System.Windows.Forms.Padding(0)
+        Me.grpPosition.Size = New System.Drawing.Size(60, 35)
         Me.grpPosition.TabIndex = 10
         Me.grpPosition.TabStop = False
         Me.grpPosition.Text = "Position"
@@ -339,12 +341,13 @@ Partial Class PlaylistView
         'txtPosition
         '
         Me.txtPosition.Dock = System.Windows.Forms.DockStyle.Fill
-        Me.txtPosition.Location = New System.Drawing.Point(1, 12)
+        Me.txtPosition.Location = New System.Drawing.Point(0, 11)
         Me.txtPosition.Margin = New System.Windows.Forms.Padding(0)
         Me.txtPosition.Name = "txtPosition"
-        Me.txtPosition.Size = New System.Drawing.Size(56, 18)
+        Me.txtPosition.Size = New System.Drawing.Size(60, 18)
         Me.txtPosition.TabIndex = 0
-        Me.txtPosition.Text = "00:00:00.00"
+        Me.txtPosition.Text = "+00:00:00.00"
+        Me.txtPosition.TextAlign = System.Windows.Forms.HorizontalAlignment.Right
         Me.txtPosition.WordWrap = False
         '
         'grpRemaining
@@ -354,11 +357,11 @@ Partial Class PlaylistView
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.grpRemaining.Controls.Add(Me.txtRemaining)
         Me.grpRemaining.Font = New System.Drawing.Font("Microsoft Sans Serif", 6.75!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.grpRemaining.Location = New System.Drawing.Point(174, 0)
+        Me.grpRemaining.Location = New System.Drawing.Point(180, 0)
         Me.grpRemaining.Margin = New System.Windows.Forms.Padding(0)
         Me.grpRemaining.Name = "grpRemaining"
         Me.grpRemaining.Padding = New System.Windows.Forms.Padding(0)
-        Me.grpRemaining.Size = New System.Drawing.Size(65, 35)
+        Me.grpRemaining.Size = New System.Drawing.Size(60, 35)
         Me.grpRemaining.TabIndex = 11
         Me.grpRemaining.TabStop = False
         Me.grpRemaining.Text = "Remaining"
@@ -368,9 +371,10 @@ Partial Class PlaylistView
         Me.txtRemaining.Location = New System.Drawing.Point(1, 12)
         Me.txtRemaining.Margin = New System.Windows.Forms.Padding(0)
         Me.txtRemaining.Name = "txtRemaining"
-        Me.txtRemaining.Size = New System.Drawing.Size(65, 18)
+        Me.txtRemaining.Size = New System.Drawing.Size(60, 18)
         Me.txtRemaining.TabIndex = 0
-        Me.txtRemaining.Text = "00:00:00.00"
+        Me.txtRemaining.Text = "+00:00:00.00"
+        Me.txtRemaining.TextAlign = System.Windows.Forms.HorizontalAlignment.Right
         Me.txtRemaining.WordWrap = False
         '
         'layoutName
@@ -385,7 +389,7 @@ Partial Class PlaylistView
         Me.layoutName.Margin = New System.Windows.Forms.Padding(0)
         Me.layoutName.MinimumSize = New System.Drawing.Size(70, 27)
         Me.layoutName.Name = "layoutName"
-        Me.layoutName.Size = New System.Drawing.Size(239, 27)
+        Me.layoutName.Size = New System.Drawing.Size(246, 27)
         Me.layoutName.TabIndex = 15
         '
         'nudLayer
@@ -393,7 +397,7 @@ Partial Class PlaylistView
         Me.nudLayer.Anchor = System.Windows.Forms.AnchorStyles.Right
         Me.nudLayer.AutoSize = True
         Me.nudLayer.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.nudLayer.Location = New System.Drawing.Point(196, 3)
+        Me.nudLayer.Location = New System.Drawing.Point(203, 3)
         Me.nudLayer.Margin = New System.Windows.Forms.Padding(0)
         Me.nudLayer.Maximum = New Decimal(New Integer() {1000, 0, 0, 0})
         Me.nudLayer.Minimum = New Decimal(New Integer() {1, 0, 0, -2147483648})
@@ -406,7 +410,7 @@ Partial Class PlaylistView
         Me.nudChannel.Anchor = System.Windows.Forms.AnchorStyles.Right
         Me.nudChannel.AutoSize = True
         Me.nudChannel.Font = New System.Drawing.Font("Microsoft Sans Serif", 8.25!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.nudChannel.Location = New System.Drawing.Point(154, 3)
+        Me.nudChannel.Location = New System.Drawing.Point(161, 3)
         Me.nudChannel.Margin = New System.Windows.Forms.Padding(0)
         Me.nudChannel.Maximum = New Decimal(New Integer() {1000, 0, 0, 0})
         Me.nudChannel.Name = "nudChannel"
@@ -423,7 +427,7 @@ Partial Class PlaylistView
         Me.txtName.Location = New System.Drawing.Point(2, 3)
         Me.txtName.Margin = New System.Windows.Forms.Padding(0)
         Me.txtName.Name = "txtName"
-        Me.txtName.Size = New System.Drawing.Size(151, 20)
+        Me.txtName.Size = New System.Drawing.Size(158, 20)
         Me.txtName.TabIndex = 10
         Me.txtName.Text = "Name"
         '
@@ -447,7 +451,7 @@ Partial Class PlaylistView
         '
         Me.layoutHeaderContentSplit.Panel2.Controls.Add(Me.layoutContentSplit)
         Me.layoutHeaderContentSplit.Panel2MinSize = 0
-        Me.layoutHeaderContentSplit.Size = New System.Drawing.Size(263, 150)
+        Me.layoutHeaderContentSplit.Size = New System.Drawing.Size(270, 150)
         Me.layoutHeaderContentSplit.SplitterDistance = 65
         Me.layoutHeaderContentSplit.TabIndex = 0
         '
@@ -459,9 +463,9 @@ Partial Class PlaylistView
         Me.AutoScroll = True
         Me.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle
         Me.Controls.Add(Me.layoutHeaderContentSplit)
-        Me.MinimumSize = New System.Drawing.Size(265, 65)
+        Me.MinimumSize = New System.Drawing.Size(270, 65)
         Me.Name = "PlaylistView"
-        Me.Size = New System.Drawing.Size(263, 150)
+        Me.Size = New System.Drawing.Size(270, 150)
         Me.layoutContentSplit.Panel1.ResumeLayout(False)
         Me.layoutContentSplit.Panel1.PerformLayout()
         Me.layoutContentSplit.Panel2.ResumeLayout(False)

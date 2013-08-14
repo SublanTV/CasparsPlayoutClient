@@ -28,7 +28,9 @@ Partial Class MainWindow
         Me.layoutPlaylistSplit = New System.Windows.Forms.SplitContainer()
         Me.layoutUpDownSplit = New System.Windows.Forms.SplitContainer()
         Me.layoutCgLib = New System.Windows.Forms.SplitContainer()
-        Me.lsvPlayingMedia = New System.Windows.Forms.ListView()
+        Me.layoutTableMain = New System.Windows.Forms.TableLayoutPanel()
+        Me.layoutInfoPanel = New System.Windows.Forms.Panel()
+        Me.lblClock = New System.Windows.Forms.Label()
         Me.layoutButtonsPanel = New System.Windows.Forms.Panel()
         Me.layoutButtonsFlow = New System.Windows.Forms.FlowLayoutPanel()
         Me.cmbConnect = New System.Windows.Forms.Button()
@@ -42,6 +44,8 @@ Partial Class MainWindow
         Me.lblAddress = New System.Windows.Forms.Label()
         Me.txtPort = New System.Windows.Forms.TextBox()
         Me.txtAddress = New System.Windows.Forms.TextBox()
+        Me.lblDate = New System.Windows.Forms.Label()
+        Me.lblStatus = New System.Windows.Forms.Label()
         CType(Me.layoutPlaylistSplit, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.layoutPlaylistSplit.Panel2.SuspendLayout()
         Me.layoutPlaylistSplit.SuspendLayout()
@@ -52,6 +56,8 @@ Partial Class MainWindow
         CType(Me.layoutCgLib, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.layoutCgLib.Panel1.SuspendLayout()
         Me.layoutCgLib.SuspendLayout()
+        Me.layoutTableMain.SuspendLayout()
+        Me.layoutInfoPanel.SuspendLayout()
         Me.layoutButtonsPanel.SuspendLayout()
         Me.layoutButtonsFlow.SuspendLayout()
         CType(Me.nudLayerClear, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -103,20 +109,55 @@ Partial Class MainWindow
         '
         'layoutCgLib.Panel1
         '
-        Me.layoutCgLib.Panel1.Controls.Add(Me.lsvPlayingMedia)
+        Me.layoutCgLib.Panel1.Controls.Add(Me.layoutTableMain)
         Me.layoutCgLib.Size = New System.Drawing.Size(617, 469)
         Me.layoutCgLib.SplitterDistance = 542
         Me.layoutCgLib.TabIndex = 0
         '
-        'lsvPlayingMedia
+        'layoutTableMain
         '
-        Me.lsvPlayingMedia.Dock = System.Windows.Forms.DockStyle.Fill
-        Me.lsvPlayingMedia.GridLines = True
-        Me.lsvPlayingMedia.Location = New System.Drawing.Point(0, 0)
-        Me.lsvPlayingMedia.Name = "lsvPlayingMedia"
-        Me.lsvPlayingMedia.Size = New System.Drawing.Size(540, 467)
-        Me.lsvPlayingMedia.TabIndex = 1
-        Me.lsvPlayingMedia.UseCompatibleStateImageBehavior = False
+        Me.layoutTableMain.AutoSize = True
+        Me.layoutTableMain.ColumnCount = 1
+        Me.layoutTableMain.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100.0!))
+        Me.layoutTableMain.Controls.Add(Me.layoutInfoPanel, 0, 0)
+        Me.layoutTableMain.Dock = System.Windows.Forms.DockStyle.Fill
+        Me.layoutTableMain.Location = New System.Drawing.Point(0, 0)
+        Me.layoutTableMain.Name = "layoutTableMain"
+        Me.layoutTableMain.RowCount = 2
+        Me.layoutTableMain.RowStyles.Add(New System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 50.0!))
+        Me.layoutTableMain.RowStyles.Add(New System.Windows.Forms.RowStyle())
+        Me.layoutTableMain.Size = New System.Drawing.Size(540, 467)
+        Me.layoutTableMain.TabIndex = 0
+        '
+        'layoutInfoPanel
+        '
+        Me.layoutInfoPanel.BackColor = System.Drawing.SystemColors.ControlDarkDark
+        Me.layoutInfoPanel.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle
+        Me.layoutInfoPanel.Controls.Add(Me.lblStatus)
+        Me.layoutInfoPanel.Controls.Add(Me.lblDate)
+        Me.layoutInfoPanel.Controls.Add(Me.lblClock)
+        Me.layoutInfoPanel.Dock = System.Windows.Forms.DockStyle.Fill
+        Me.layoutInfoPanel.Location = New System.Drawing.Point(3, 3)
+        Me.layoutInfoPanel.Name = "layoutInfoPanel"
+        Me.layoutInfoPanel.Size = New System.Drawing.Size(534, 44)
+        Me.layoutInfoPanel.TabIndex = 0
+        '
+        'lblClock
+        '
+        Me.lblClock.AccessibleDescription = "Clock"
+        Me.lblClock.AccessibleName = "Clock"
+        Me.lblClock.AccessibleRole = System.Windows.Forms.AccessibleRole.Clock
+        Me.lblClock.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Bottom), System.Windows.Forms.AnchorStyles)
+        Me.lblClock.BackColor = System.Drawing.Color.Transparent
+        Me.lblClock.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D
+        Me.lblClock.Font = New System.Drawing.Font("Lucida Console", 20.0!, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.lblClock.ForeColor = System.Drawing.Color.Lime
+        Me.lblClock.Location = New System.Drawing.Point(164, 1)
+        Me.lblClock.Name = "lblClock"
+        Me.lblClock.Size = New System.Drawing.Size(200, 40)
+        Me.lblClock.TabIndex = 0
+        Me.lblClock.Text = "00:00:00.0"
+        Me.lblClock.TextAlign = System.Drawing.ContentAlignment.MiddleCenter
         '
         'layoutButtonsPanel
         '
@@ -254,6 +295,40 @@ Partial Class MainWindow
         Me.txtAddress.TabIndex = 0
         Me.txtAddress.Text = "localhost"
         '
+        'lblDate
+        '
+        Me.lblDate.AccessibleDescription = "Date"
+        Me.lblDate.AccessibleName = "Date"
+        Me.lblDate.AccessibleRole = System.Windows.Forms.AccessibleRole.Clock
+        Me.lblDate.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Bottom), System.Windows.Forms.AnchorStyles)
+        Me.lblDate.BackColor = System.Drawing.Color.Transparent
+        Me.lblDate.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D
+        Me.lblDate.Font = New System.Drawing.Font("Lucida Console", 14.25!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.lblDate.ForeColor = System.Drawing.Color.Lime
+        Me.lblDate.Location = New System.Drawing.Point(39, 1)
+        Me.lblDate.Name = "lblDate"
+        Me.lblDate.Size = New System.Drawing.Size(125, 40)
+        Me.lblDate.TabIndex = 1
+        Me.lblDate.Text = "01/01/2013"
+        Me.lblDate.TextAlign = System.Drawing.ContentAlignment.MiddleCenter
+        '
+        'lblStatus
+        '
+        Me.lblStatus.AccessibleDescription = "Date"
+        Me.lblStatus.AccessibleName = "Date"
+        Me.lblStatus.AccessibleRole = System.Windows.Forms.AccessibleRole.Clock
+        Me.lblStatus.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Bottom), System.Windows.Forms.AnchorStyles)
+        Me.lblStatus.BackColor = System.Drawing.Color.Transparent
+        Me.lblStatus.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D
+        Me.lblStatus.Font = New System.Drawing.Font("Lucida Console", 14.25!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.lblStatus.ForeColor = System.Drawing.Color.Red
+        Me.lblStatus.Location = New System.Drawing.Point(364, 1)
+        Me.lblStatus.Name = "lblStatus"
+        Me.lblStatus.Size = New System.Drawing.Size(125, 40)
+        Me.lblStatus.TabIndex = 2
+        Me.lblStatus.Text = "Stopped"
+        Me.lblStatus.TextAlign = System.Drawing.ContentAlignment.MiddleCenter
+        '
         'MainWindow
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
@@ -274,8 +349,11 @@ Partial Class MainWindow
         CType(Me.layoutUpDownSplit, System.ComponentModel.ISupportInitialize).EndInit()
         Me.layoutUpDownSplit.ResumeLayout(False)
         Me.layoutCgLib.Panel1.ResumeLayout(False)
+        Me.layoutCgLib.Panel1.PerformLayout()
         CType(Me.layoutCgLib, System.ComponentModel.ISupportInitialize).EndInit()
         Me.layoutCgLib.ResumeLayout(False)
+        Me.layoutTableMain.ResumeLayout(False)
+        Me.layoutInfoPanel.ResumeLayout(False)
         Me.layoutButtonsPanel.ResumeLayout(False)
         Me.layoutButtonsFlow.ResumeLayout(False)
         CType(Me.nudLayerClear, System.ComponentModel.ISupportInitialize).EndInit()
@@ -296,7 +374,6 @@ Partial Class MainWindow
         ' Fügen Sie Initialisierungen nach dem InitializeComponent()-Aufruf hinzu.
 
     End Sub
-    Friend WithEvents lsvPlayingMedia As System.Windows.Forms.ListView
     Friend WithEvents layoutButtonsPanel As System.Windows.Forms.Panel
     Friend WithEvents layoutAdressPanel As System.Windows.Forms.Panel
     Friend WithEvents lblAddress As System.Windows.Forms.Label
@@ -310,4 +387,9 @@ Partial Class MainWindow
     Friend WithEvents cmbClearChannel As System.Windows.Forms.Button
     Friend WithEvents nudLayerClear As System.Windows.Forms.NumericUpDown
     Friend WithEvents cmbClearLayer As System.Windows.Forms.Button
+    Friend WithEvents layoutTableMain As System.Windows.Forms.TableLayoutPanel
+    Friend WithEvents layoutInfoPanel As System.Windows.Forms.Panel
+    Friend WithEvents lblClock As System.Windows.Forms.Label
+    Friend WithEvents lblDate As System.Windows.Forms.Label
+    Friend WithEvents lblStatus As System.Windows.Forms.Label
 End Class

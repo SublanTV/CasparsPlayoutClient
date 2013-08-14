@@ -23,10 +23,9 @@ Public Class PlaylistView
     Private playlist As IPlaylistItem
     Private childs As List(Of PlaylistView)
     Private startCompact As Boolean
-    'Private waiting As Boolean = False
     Private Delegate Sub updateDelegate()
     Private cMenu As ContextMenuStrip
-    Private noWarn As Integer = 5000
+    Private nowarn As Integer = 5000
     Private warn As Integer = 1000
 
     Private updateItems As New Threading.Semaphore(1, 1)
@@ -60,7 +59,6 @@ Public Class PlaylistView
 
         init()
         initMenu()
-        'AddHandler playlist.waitForNext, AddressOf waitForNext
     End Sub
 
     Private Sub init()
@@ -125,7 +123,7 @@ Public Class PlaylistView
     End Sub
 
     Private Sub initMenu()
-        '' ContexMenü hinzufügen
+        '' Add ContexMenu
         cMenu = New ContextMenuStrip
         cMenu.Items.Add(New ToolStripMenuItem("Add Block", Nothing, New EventHandler(AddressOf addBlockItem)))
 
@@ -146,13 +144,14 @@ Public Class PlaylistView
             Me.Invoke(d)
         Else
             setData()
-            updateItems.WaitOne()
-            For Each child In childs
-                child.onDataChanged()
-            Next
-            updateItems.Release()
+            '' if we have to wait more than a half frame (25fps), we'll drop that update
+            If updateItems.WaitOne(20) Then
+                For Each child In childs
+                    child.onDataChanged()
+                Next
+                updateItems.Release()
+            End If
         End If
-
     End Sub
 
     Private Sub setData()
@@ -281,13 +280,6 @@ Public Class PlaylistView
             nudLayer.Enabled = True
             txtName.ReadOnly = False
         End If
-        '' Hier kommt es immer wieder zum Deadlock und ich weiß nicht wieso!
-        'updateItems.WaitOne()
-        'For Each child In childs
-        '    child.onChangedPlayingState()
-        'Next
-        'updateItems.Release()
-
     End Sub
 
     Private Sub ckbParallel_CheckedChanged(ByVal sender As System.Object, ByVal e As System.EventArgs) Handles ckbParallel.CheckedChanged
@@ -339,11 +331,6 @@ Public Class PlaylistView
     Private Sub txtName_Leave(ByVal sender As Object, ByVal e As System.EventArgs) Handles txtName.Leave
         playlist.setName(txtName.Text)
     End Sub
-
-    'Private Sub waitForNext()
-    '    waiting = True
-    'End Sub
-
 
     ''
     '' Hinzufügen / entfernen von Blöcken

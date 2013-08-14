@@ -3,54 +3,7 @@ ToDo:
 CORE:
 =====
 
-- Change Playlists to work with Events instead of waiting in Threads
-There are 6 events:
-	1. Stopped --> The Playlist has stopped playing
-	2. Started --> The Playlist has started playing
-	3. Paused --> The Playlist has paused playing
-	4. Changed --> The Playlists parameter has been changed (i.e. duration, type etc.)
-	5. Canceled --> The Playlists canceled an action like play/stop/pause for some given reason. 
-	6. Aborted --> the playlist has been aborted (stopped playing no matter which state it was on)
-Each Playlist is handler for it's child items and may be for it's self.
-Example msg flow (PL = Playlist, SPL = SubPlaylist):
-	PL1 --	SPL1
-			SPL2
-
-	PL1.play():		--> PL1.started
-					<-- PL1.started*
-					SPL1.play()
-	SPL1.play():	--> SPL1.started
-					<-- SPL1.started*
-	PL1:			<-- SPL1.started
-	...
-	PL1.pause():	--> PL1.paused
-					<-- PL1.paused*
-					SPL1.pause()
-					SPL2.pause()
-	SPL1.pause():	--> SPL1.paused
-					<-- SPL1.paused*
-	SPL2.pause():	--> SPL2.paused
-					<-- SPL2.paused*
-					---> SPL2.canceled(pause, NOT PLAYING)
-	PL1:			<-- SPL1.paused
-					<-- SPL2.paused
-					<-- SPL2.canceled(pause, NOT PLAYING)
-	PL1.unpause():	--> PL1.started()
-					<-- PL1.started()*
-					SPL1.unpause()
-	SPL1.unpause(): --> SPL1.started
-					<-- SPL1.started*
-	PL1:			<-- SPL1.started
-	...
-	SPL1:			--> SPL1.stopped
-					<-- SPL1.stopped*
-	PL1:			<-- SPL1.stopped
-					SPL2.play()
-	.....
-	.....
-
-* = The playlist starts to play/pause etc. after receiving it's own event! So .play() only send events. 
-This way, we make sure that we handle everything in the right thread.
+- change frameTick from synced to normal timer as we don't need synced frameticks anymore
 
 
 - implement playlist trigger
@@ -70,6 +23,7 @@ This way, we make sure that we handle everything in the right thread.
 --- Template
 --- Color
 --- audio
+---> Command - CD 12/08/13
 
 
 - Implement missing save/load Playlist from xml functions
@@ -86,6 +40,9 @@ Done - CD 02/08/13
 
 - Inkonsistens frame/ms bei viel funktionen und eigenschaften wie getDuratation()/Position etc. auflösen
 
+
+Done - CD 13/08/13
+- Change Playlists to work with Events instead of waiting in Threads
 
 Done - CD 08/08/13
 - Change Commands from Functions to own classes

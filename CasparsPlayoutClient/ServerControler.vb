@@ -23,7 +23,7 @@ Public Class ServerControler
 
     Public readyForUpdate As New Semaphore(1, 1)
     Private cmdConnection As CasparCGConnection
-    Private tickConnection As CasparCGConnection
+    'Private tickConnection As CasparCGConnection
     Private updateConnection As CasparCGConnection
     Private testConnection As CasparCGConnection
     Private tickThread As Thread
@@ -52,21 +52,14 @@ Public Class ServerControler
         opened = False
 
         If Not IsNothing(updater) Then updater.stopUpdate()
-        Try
-            If Not IsNothing(tickThread) Then
-                tickThread.Interrupt()
-                tickThread.Abort()
-                tickThread = Nothing
-            End If
-        Catch e As ThreadInterruptedException
-        End Try
-
-        If Not IsNothing(updater) Then updater.stopUpdate()
+        If Not IsNothing(ticker) Then
+            ticker.stopTicker()
+        End If
 
         If Not IsNothing(cmdConnection) Then cmdConnection.close()
         If Not IsNothing(updateConnection) Then updateConnection.close()
         If Not IsNothing(testConnection) Then testConnection.close()
-        If Not IsNothing(tickConnection) Then tickConnection.close()
+        'If Not IsNothing(tickConnection) Then tickConnection.close()
         channels = 0
         ReDim channelFPS(0)
     End Sub
@@ -76,9 +69,9 @@ Public Class ServerControler
     End Function
 
     Public Function isConnected() As Boolean
-        Return Not IsNothing(updateConnection) AndAlso Not IsNothing(tickConnection) AndAlso Not _
+        Return Not IsNothing(updateConnection) AndAlso Not _
             IsNothing(cmdConnection) AndAlso Not IsNothing(testConnection) AndAlso _
-            updateConnection.isConnected AndAlso tickConnection.isConnected AndAlso _
+            updateConnection.isConnected AndAlso _
             cmdConnection.isConnected AndAlso testConnection.isConnected
     End Function
 
@@ -88,10 +81,10 @@ Public Class ServerControler
         cmdConnection = New CasparCGConnection(serverAddress, serverPort)
         updateConnection = New CasparCGConnection(serverAddress, serverPort)
         testConnection = New CasparCGConnection(serverAddress, serverPort)
-        tickConnection = New CasparCGConnection(serverAddress, serverPort)
+        'tickConnection = New CasparCGConnection(serverAddress, serverPort)
 
 
-        If tickConnection.connect() AndAlso testConnection.connect() AndAlso updateConnection.connect() AndAlso cmdConnection.connect() Then
+        If testConnection.connect() AndAlso updateConnection.connect() AndAlso cmdConnection.connect() Then
             opened = True
             ' Channels des Servers bestimmen
             channels = testConnection.getServerChannels
@@ -105,8 +98,8 @@ Public Class ServerControler
                 channelFPS(c) = getChannelFPS(c + 1)
             Next
 
-            ' Tick Thread starten
-            ticker = New FrameTicker(tickConnection, Me, 200000, framesPerTick)
+            ' Tick  starten
+            ticker = New frameTicker(Me, framesPerTick)
 
             ' updater starten
             updater = MediaUpdaterFactory.getMediaUpdater(updateConnection, playlist, Me)
@@ -220,12 +213,21 @@ Public Class ServerControler
     ''' <returns></returns>
     ''' <remarks></remarks>
     Public Shared Function getTimeStringOfMS(ByVal milliseconds As Long) As String
-        If milliseconds > 0 Then
-            Dim h As String = Convert.ToUInt16(Math.Truncate(milliseconds / 3600000)).ToString("D2")
-            Dim m As String = Convert.ToUInt16(Math.Truncate((milliseconds / 60000) Mod 60)).ToString("D2")
-            Dim s As String = Convert.ToUInt16(Math.Truncate((milliseconds / 1000) Mod 60)).ToString("D2")
-            Dim ms As String = Convert.ToUInt16(Math.Truncate(milliseconds Mod 1000)).ToString("D2").Substring(0, 2)
-            Return h & ":" & m & ":" & s & "." & ms
+        If Not milliseconds = 0 Then
+            Dim neg As Boolean = False
+            If milliseconds < 0 Then
+                milliseconds = milliseconds * -1
+                neg = True
+            End If
+            Dim h As String = Convert.ToUInt16(Math.Truncate(Math.Abs(milliseconds) / 3600000)).ToString("D2")
+            Dim m As String = Convert.ToUInt16(Math.Truncate((Math.Abs(milliseconds) / 60000) Mod 60)).ToString("D2")
+            Dim s As String = Convert.ToUInt16(Math.Truncate((Math.Abs(milliseconds) / 1000) Mod 60)).ToString("D2")
+            Dim ms As String = Convert.ToUInt16(Math.Truncate(Math.Abs(milliseconds) Mod 1000)).ToString("D2").Substring(0, 2)
+            If neg Then
+                Return "-" & h & ":" & m & ":" & s & "." & ms
+            Else
+                Return h & ":" & m & ":" & s & "." & ms
+            End If
         Else : Return "00:00:00.00"
         End If
     End Function
@@ -287,43 +289,6 @@ Public Class ServerControler
         End If
         Return -1
     End Function
-
-    'Public Function getMediaInfo(ByRef media As CasparCGMedia) As String
-    '    If isConnected() Then
-    '        If media.getMediaType = CasparCGMedia.MediaType.TEMPLATE Then
-    '            Dim info As New InfoTemplateCommand(media)
-    '            If info.execute(testConnection).isOK Then
-    '                Return info.getResponse.getXMLData
-    '            Else
-    '                logger.err("ServerController.getMediaInfo: Error loading xml data received from server for " & media.toString)
-    '                logger.err("ServerController.getMediaInfo: ServerMessage dump: " & info.getResponse.getServerMessage)
-    '            End If
-    '        Else
-    '            Dim layer = testConnection.getFreeLayer(testChannel)
-    '            Dim cmd As ICommand = New LoadbgCommand(testChannel, layer, media.getFullName)
-    '            If cmd.execute(testConnection).isOK Then
-    '                Dim infoDoc As New MSXML2.DOMDocument
-    '                cmd = New InfoCommand(testChannel, layer, True)
-
-    '                If infoDoc.loadXML(cmd.execute(testConnection).getXMLData()) AndAlso Not IsNothing(infoDoc.selectSingleNode("producer").selectSingleNode("destination")) Then
-    '                    If infoDoc.selectSingleNode("producer").selectSingleNode("destination").selectSingleNode("producer").selectSingleNode("type").nodeTypedValue.Equals("separated-producer") Then
-    '                        Return infoDoc.selectSingleNode("producer").selectSingleNode("destination").selectSingleNode("producer").selectSingleNode("fill").selectSingleNode("producer").xml
-    '                    Else
-    '                        Return infoDoc.selectSingleNode("producer").selectSingleNode("destination").selectSingleNode("producer").xml
-    '                    End If
-    '                Else
-    '                    logger.err("ServerController.getMediaInfo: Error loading xml data received from server for " & media.toString & ". Error: " & infoDoc.parseError.reason)
-    '                    logger.err("ServerController.getMediaInfo: ServerMessages dump: " & cmd.getResponse.getServerMessage)
-    '                End If
-    '                cmd = New ClearCommand(testChannel, layer)
-    '                cmd.execute(testConnection)
-    '            Else
-    '                logger.err("ServerController.getMediaInfo: Error getting media information. Server messages was: " & cmd.getResponse.getServerMessage)
-    '            End If
-    '        End If
-    '    End If
-    '    Return ""
-    'End Function
 
     ''' <summary>
     ''' Returns a Dictionary of all media and templates on the server key by their names.
@@ -393,185 +358,238 @@ Public Class ServerControler
     End Function
 
     Public Sub stopTicker()
-        If Not IsNothing(tickThread) AndAlso tickThread.IsAlive Then
-            tickThread.Abort()
+        If Not IsNothing(ticker) Then
+            ticker.stopTicker()
         End If
     End Sub
 
     Public Sub startTicker()
-        If IsNothing(tickThread) OrElse Not tickThread.IsAlive AndAlso Not IsNothing(ticker) Then
-            tickThread = New Thread(AddressOf ticker.tick)
-            tickThread.Start()
+        If Not IsNothing(ticker) Then
+            ticker.startTicker()
         End If
     End Sub
 
     Public Sub toggleTickerActive()
-        If tickThread.IsAlive Then
-            stopTicker()
-        Else
-            startTicker()
-        End If
+        ticker.toggleTicker()
     End Sub
 
 End Class
 
-''' <summary>
-''' A ticker class which raises events if a frame change is noticed in one of the casparCG channels. 
-''' There is no waranty that a tick will be rissen for every framechange at all, but the frame number send should be close to the real one.
-''' The period of ticks is close to "per frame" but will increase with every handler added for the frameTickEvent. 
-''' Nevertheless, the precision of the frame number given by the event will not be affect much by increasing the eventHandler count.
-''' During each poll request to the server for the current frame number, a short period of interpolated ticks will be rissen.
-''' These are only calculated and not proofed to be in correct sync to the server. The length of this period could be configured.
-''' Use bigger values if you have a poor network  conncetion. Default is 5 seconds (5000ms). It is possible that there will be no 
-''' interpolated tick at all if the proccessing of the poll and raising the event takes longer than the given period.
-''' In that case, you will only get received values form the server when they arrive.
-''' It is very likley that the given frame number is behind the frame number at the servers channel by a few frames.
-''' Since this delay may differ depending on your networkconnection and hardware, it should be, more or less, constant 
-''' and will be minimized by a simple compensation technique.
-''' 
-''' To take load off your cpu, you could set a upper bound to the frequency at which frameTickEvents should be rissen.
-''' As a default, it will be tried to raise one for every frame. But this is just a trie. Depending on your hardware and the number
-''' of EventHandler, it may be only every few frames.
-''' If you don't need high frequencies, use higher values to take load off your cpu.
-''' Take in mind, that the bound will be related to the channel with the highest fps. So if you have a channel with p25 and one with p50 and
-''' a frameInterval of 4, channel p50 will tick not more than every 4 frames but channel p25 could still tick every 2 frames.
-'''  
-''' Start tick() in a new Thread and register handlers for the frameTick event. 
-''' Keep in mind to use delegates since the event will likely to be rissen by a different thread.
-''' </summary>
-''' <remarks></remarks>
-Public Class FrameTicker
+
+Public Class frameTicker
+    Private sysTimer As Timers.Timer
+    Private frametime As Integer
     Private sc As ServerControler
-    Private con As CasparCGConnection
-    Public interpolationTime As Integer
-    Private frameInterval As Integer
-    Private channels As Integer
-    Private channelFameTime() As Integer
-    Private channelLastUpdate() As Long
-    Private channelFrame As New Dictionary(Of Integer, Long)
-    Private minFrameTime As Integer = Integer.MaxValue
 
-    Public Event frameTick(ByVal sender As Object, ByVal e As frameTickEventArgs)
-
-    ''' <summary>
-    ''' Creates a new ticker instance.
-    ''' </summary>
-    ''' <param name="con">the connection to poll the channels for the actual frame number</param>
-    ''' <param name="controller">the servercontroler</param>
-    ''' <param name="interpolationTime">the number of milliseconds between each servercall. In that time, the frame tick will be interpolated by a local timer which may differ from the servers real values.</param>
-    ''' <param name="frameInterval">the desired interval in which frameTickEvents should be rissen. This is just a desired value and will only give a upper bound but not a lower bound. Default is 1 tick per frame</param> 
-    ''' <remarks></remarks>
-    Public Sub New(ByRef con As CasparCGConnection, ByVal controller As ServerControler, Optional ByVal interpolationTime As Integer = 5000, Optional ByVal frameInterval As Integer = 1)
+    Public Sub New(ByVal controller As ServerControler, Optional ByVal frameInterval As Integer = 1)
         sc = controller
-        Me.con = con
-        Me.interpolationTime = interpolationTime
-        Me.frameInterval = frameInterval
 
-        channels = sc.getChannels 'Anzahl der Channels bestimmen
-
-        ReDim channelFameTime(channels)
-        ReDim channelLastUpdate(channels)
-        For i As Integer = 1 To channels
-            channelFameTime(i - 1) = 1000 / (sc.getFPS(i) / 100)
-            If minFrameTime > channelFameTime(i - 1) - 1 Then minFrameTime = channelFameTime(i - 1)
-            channelFrame.Add(i, 0)
+        For i As Integer = 1 To sc.getChannels
+            If frametime > 1000 / (sc.getFPS(i) / 100) OrElse frametime < 1 Then frametime = 1000 / (sc.getFPS(i) / 100)
         Next
 
-        logger.debug("frameTicker.New: Ticker init by thread " & Thread.CurrentThread.ManagedThreadId)
+        If frameInterval > 1 Then
+            sysTimer = New Timers.Timer(frametime * frameInterval)
+        Else
+            sysTimer = New Timers.Timer(frametime)
+        End If
+        sysTimer.Enabled = False
+        AddHandler sysTimer.Elapsed, Sub() RaiseEvent frameTick()
     End Sub
 
-    Public Sub tick()
-        logger.debug("frameTicker.tick: Ticker thread " & Thread.CurrentThread.ManagedThreadId & " started")
-        Dim timer As New Stopwatch ' Timer to measure the time it takes to calc current frame / channel and inform listeners
-        Dim offsetTimer As New Stopwatch
-        Dim iterationStart As Long
-        Dim iterationEnd As Long
-        Dim interpolatingSince As Integer
+    Public Event frameTick()
 
-        Dim infoDoc As New MSXML2.DOMDocument
-        Dim frame As Long = 0
-        Dim ch = 0
-        Dim info As New InfoCommand(1, Integer.MaxValue)
-
-        Try
-            timer.Start()
-            offsetTimer.Start()
-            While True
-                ' Alle channels durchgehen
-                For channel As Integer = 1 To channels
-                    ch = channel - 1
-                    'werte einlesen
-                    DirectCast(info.getParameter("channel"), CommandParameter(Of Integer)).setValue(channel)
-                    offsetTimer.Restart()
-                    infoDoc.loadXML(info.execute(con).getXMLData)
-                    frame = infoDoc.firstChild.selectSingleNode("frame-number").nodeTypedValue + (offsetTimer.ElapsedMilliseconds / 2 / channelFameTime(ch))
-                    offsetTimer.Stop()
-
-                    ' Korrigierten Wert für die Frame number berechen aus dem rückgabewert des servers + der frames die in der bearbeitungszeit
-                    ' vermeintlich vergangen sind. Wir gehen vereinfacht davon aus, das die hälfte der Zeit für den Rückweg 
-                    ' vom Server zu uns gebaucht wurde da wir das nicht genau messen können.
-                    If frame <> channelFrame.Item(channel) Then
-                        channelFrame.Item(channel) = frame
-                    End If
-                Next
-                ' Event auslösen
-                RaiseEvent frameTick(Me, New frameTickEventArgs(channelFrame))
-                logger.debug("FrameTicker.tick: Raise frameTick()")
-
-                ' Jetzt ein paar frames nur rechnen und dann wieder mit dem Serverwert vergleichen
-                Dim hasChanged = False
-                interpolatingSince = timer.ElapsedMilliseconds
-                While timer.ElapsedMilliseconds - interpolatingSince < interpolationTime
-                    iterationStart = timer.ElapsedMilliseconds
-                    For channel As Integer = 0 To channels - 1
-                        ' Interpoliere frames indem wir die vergange zeit der der letzen aktualisierung betrachten.
-                        ' Ist sie größer als die frameTime müssen wir die frame ändern.
-                        If iterationStart - channelLastUpdate(channel) >= channelFameTime(channel) Then
-                            hasChanged = True
-                            channelFrame.Item(channel + 1) = channelFrame.Item(channel + 1) + ((iterationStart - channelLastUpdate(channel)) / channelFameTime(channel))
-                            channelLastUpdate(channel) = iterationStart
-                        End If
-                    Next
-                    '' Event auslösen
-                    If hasChanged Then
-                        RaiseEvent frameTick(Me, New frameTickEventArgs(channelFrame))
-                        logger.debug("FrameTicker.tick: Raise frameTick()")
-                    End If
-                    hasChanged = False
-
-                    ' Jetzt noch ein bisschen warten um die cpu zu entlasten. Mindestens bis die nächste frame möglich ist
-                    ' oder soviele Frames wie im frameInterval angegeben
-                    iterationEnd = timer.ElapsedMilliseconds
-                    If iterationEnd - iterationStart < (minFrameTime * frameInterval) Then
-                        While timer.ElapsedMilliseconds < iterationEnd + (minFrameTime * frameInterval) - (iterationEnd - iterationStart)
-                            'Thread.Sleep((minFrameTime * frameInterval) - (iterationEnd - iterationStart))
-                        End While
-                    End If
-                End While
-            End While
-        Catch e As ThreadInterruptedException
-        End Try
+    Public Sub startTicker()
+        sysTimer.Enabled = True
     End Sub
+
+    Public Sub stopTicker()
+        sysTimer.Enabled = False
+    End Sub
+
+    Public Sub toggleTicker()
+        sysTimer.Enabled = Not sysTimer.Enabled
+    End Sub
+
 End Class
 
-''' <summary>
-''' The frameTick event result containing the channel which ticked and the actual framenumber.
-''' </summary>
-''' <remarks></remarks>
-Public Class frameTickEventArgs
-    Inherits EventArgs
 
-    Public Sub New(ByVal result As Dictionary(Of Integer, Long))
-        _result = result
-    End Sub
 
-    Private _result As Dictionary(Of Integer, Long)
-    Public ReadOnly Property result
-        Get
-            Return _result
-        End Get
-    End Property
-End Class
+''
+'' OLD TICKER - NOT USED ANYMORE
+''
+
+' ''' <summary>
+' ''' A ticker class which raises events if a frame change is noticed in one of the casparCG channels. 
+' ''' There is no waranty that a tick will be rissen for every framechange at all, but the frame number send should be close to the real one.
+' ''' The period of ticks is close to "per frame" but will increase with every handler added for the frameTickEvent. 
+' ''' Nevertheless, the precision of the frame number given by the event will not be affect much by increasing the eventHandler count.
+' ''' During each poll request to the server for the current frame number, a short period of interpolated ticks will be rissen.
+' ''' These are only calculated and not proofed to be in correct sync to the server. The length of this period could be configured.
+' ''' Use bigger values if you have a poor network  conncetion. Default is 5 seconds (5000ms). It is possible that there will be no 
+' ''' interpolated tick at all if the proccessing of the poll and raising the event takes longer than the given period.
+' ''' In that case, you will only get received values form the server when they arrive.
+' ''' It is very likley that the given frame number is behind the frame number at the servers channel by a few frames.
+' ''' Since this delay may differ depending on your networkconnection and hardware, it should be, more or less, constant 
+' ''' and will be minimized by a simple compensation technique.
+' ''' 
+' ''' To take load off your cpu, you could set a upper bound to the frequency at which frameTickEvents should be rissen.
+' ''' As a default, it will be tried to raise one for every frame. But this is just a trie. Depending on your hardware and the number
+' ''' of EventHandler, it may be only every few frames.
+' ''' If you don't need high frequencies, use higher values to take load off your cpu.
+' ''' Take in mind, that the bound will be related to the channel with the highest fps. So if you have a channel with p25 and one with p50 and
+' ''' a frameInterval of 4, channel p50 will tick not more than every 4 frames but channel p25 could still tick every 2 frames.
+' '''  
+' ''' Start tick() in a new Thread and register handlers for the frameTick event. 
+' ''' Keep in mind to use delegates since the event will likely to be rissen by a different thread.
+' ''' </summary>
+' ''' <remarks></remarks>
+'Public Class FrameTicker
+'    Private sc As ServerControler
+'    Private con As CasparCGConnection
+'    Public interpolationTime As Integer
+'    Private frameInterval As Integer
+'    Private channels As Integer
+'    Private channelFameTime() As Integer
+'    Private channelLastUpdate() As Long
+'    Private channelFrame As New Dictionary(Of Integer, Long)
+'    Private minFrameTime As Integer = Integer.MaxValue
+'    Private sysTimer As Timers.Timer
+
+'    Public Event frameTick(ByVal sender As Object, ByVal e As frameTickEventArgs)
+
+'    ''' <summary>
+'    ''' Creates a new ticker instance.
+'    ''' </summary>
+'    ''' <param name="con">the connection to poll the channels for the actual frame number</param>
+'    ''' <param name="controller">the servercontroler</param>
+'    ''' <param name="interpolationTime">the number of milliseconds between each servercall. In that time, the frame tick will be interpolated by a local timer which may differ from the servers real values.</param>
+'    ''' <param name="frameInterval">the desired interval in which frameTickEvents should be rissen. This is just a desired value and will only give a upper bound but not a lower bound. Default is 1 tick per frame</param> 
+'    ''' <remarks></remarks>
+'    Public Sub New(ByRef con As CasparCGConnection, ByVal controller As ServerControler, Optional ByVal interpolationTime As Integer = 5000, Optional ByVal frameInterval As Integer = 1)
+'        sc = controller
+'        Me.con = con
+'        Me.interpolationTime = interpolationTime
+'        Me.frameInterval = frameInterval
+
+'        channels = sc.getChannels 'Anzahl der Channels bestimmen
+
+'        ReDim channelFameTime(channels)
+'        ReDim channelLastUpdate(channels)
+'        For i As Integer = 1 To channels
+'            channelFameTime(i - 1) = 1000 / (sc.getFPS(i) / 100)
+'            If minFrameTime > channelFameTime(i - 1) - 1 Then minFrameTime = channelFameTime(i - 1)
+'            channelFrame.Add(i, 0)
+'        Next
+
+'        '' Test: Use timer instead of server syncronised frames as we don't need it anymore
+'        sysTimer = New Timers.Timer(minFrameTime)
+'        sysTimer.Enabled = False
+'        AddHandler sysTimer.Elapsed, Sub() RaiseEvent frameTick(Me, Nothing)
+
+'        logger.debug("frameTicker.New: Ticker init by thread " & Thread.CurrentThread.ManagedThreadId)
+'    End Sub
+
+'    Public Sub tick()
+'        logger.debug("frameTicker.tick: Ticker thread " & Thread.CurrentThread.ManagedThreadId & " started")
+
+'        If Not sysTimer.Enabled Then
+'            sysTimer.Enabled = True
+'        Else
+'            sysTimer.Enabled = False
+'        End If
+
+
+'        '    Dim timer As New Stopwatch ' Timer to measure the time it takes to calc current frame / channel and inform listeners
+'        '    Dim offsetTimer As New Stopwatch
+'        '    Dim iterationStart As Long
+'        '    Dim iterationEnd As Long
+'        '    Dim interpolatingSince As Integer
+
+'        '    Dim infoDoc As New MSXML2.DOMDocument
+'        '    Dim frame As Long = 0
+'        '    Dim ch = 0
+'        '    Dim info As New InfoCommand(1, Integer.MaxValue)
+
+'        '    Try
+'        '        timer.Start()
+'        '        offsetTimer.Start()
+'        '        While True
+'        '            ' Alle channels durchgehen
+'        '            For channel As Integer = 1 To channels
+'        '                ch = channel - 1
+'        '                'werte einlesen
+'        '                DirectCast(info.getParameter("channel"), CommandParameter(Of Integer)).setValue(channel)
+'        '                offsetTimer.Restart()
+'        '                infoDoc.loadXML(info.execute(con).getXMLData)
+'        '                frame = infoDoc.firstChild.selectSingleNode("frame-number").nodeTypedValue + (offsetTimer.ElapsedMilliseconds / 2 / channelFameTime(ch))
+'        '                offsetTimer.Stop()
+
+'        '                ' Korrigierten Wert für die Frame number berechen aus dem rückgabewert des servers + der frames die in der bearbeitungszeit
+'        '                ' vermeintlich vergangen sind. Wir gehen vereinfacht davon aus, das die hälfte der Zeit für den Rückweg 
+'        '                ' vom Server zu uns gebaucht wurde da wir das nicht genau messen können.
+'        '                If frame <> channelFrame.Item(channel) Then
+'        '                    channelFrame.Item(channel) = frame
+'        '                End If
+'        '            Next
+'        '            ' Event auslösen
+'        '            RaiseEvent frameTick(Me, New frameTickEventArgs(channelFrame))
+'        '            logger.debug("FrameTicker.tick: Raise frameTick()")
+
+'        '            ' Jetzt ein paar frames nur rechnen und dann wieder mit dem Serverwert vergleichen
+'        '            Dim hasChanged = False
+'        '            interpolatingSince = timer.ElapsedMilliseconds
+'        '            While timer.ElapsedMilliseconds - interpolatingSince < interpolationTime
+'        '                iterationStart = timer.ElapsedMilliseconds
+'        '                For channel As Integer = 0 To channels - 1
+'        '                    ' Interpoliere frames indem wir die vergange zeit der der letzen aktualisierung betrachten.
+'        '                    ' Ist sie größer als die frameTime müssen wir die frame ändern.
+'        '                    If iterationStart - channelLastUpdate(channel) >= channelFameTime(channel) Then
+'        '                        hasChanged = True
+'        '                        channelFrame.Item(channel + 1) = channelFrame.Item(channel + 1) + ((iterationStart - channelLastUpdate(channel)) / channelFameTime(channel))
+'        '                        channelLastUpdate(channel) = iterationStart
+'        '                    End If
+'        '                Next
+'        '                '' Event auslösen
+'        '                If hasChanged Then
+'        '                    RaiseEvent frameTick(Me, New frameTickEventArgs(channelFrame))
+'        '                    logger.debug("FrameTicker.tick: Raise frameTick()")
+'        '                End If
+'        '                hasChanged = False
+
+'        '                ' Jetzt noch ein bisschen warten um die cpu zu entlasten. Mindestens bis die nächste frame möglich ist
+'        '                ' oder soviele Frames wie im frameInterval angegeben
+'        '                iterationEnd = timer.ElapsedMilliseconds
+'        '                If iterationEnd - iterationStart < (minFrameTime * frameInterval) Then
+'        '                    While timer.ElapsedMilliseconds < iterationEnd + (minFrameTime * frameInterval) - (iterationEnd - iterationStart)
+'        '                        'Thread.Sleep((minFrameTime * frameInterval) - (iterationEnd - iterationStart))
+'        '                    End While
+'        '                End If
+'        '            End While
+'        '        End While
+'        '    Catch e As ThreadInterruptedException
+'        '    End Try
+'    End Sub
+'End Class
+
+' ''' <summary>
+' ''' The frameTick event result containing the channel which ticked and the actual framenumber.
+' ''' </summary>
+' ''' <remarks></remarks>
+'Public Class frameTickEventArgs
+'    Inherits EventArgs
+
+'    Public Sub New(ByVal result As Dictionary(Of Integer, Long))
+'        _result = result
+'    End Sub
+
+'    Private _result As Dictionary(Of Integer, Long)
+'    Public ReadOnly Property result
+'        Get
+'            Return _result
+'        End Get
+'    End Property
+'End Class
 
 
 

@@ -222,7 +222,7 @@ Public MustInherit Class AbstractPlaylistItem
 
     Public Overridable Function getPlayed() As Byte Implements IPlaylistItem.getPlayed
         If getDuration() > 0 AndAlso getControler.isConnected Then
-            Return Math.Min(100, (100 / getDuration()) * getPosition())
+            Return Math.Min(100, (100 / getDuration()) * Math.Max(getPosition(), 0))
         Else
             Return 0
         End If

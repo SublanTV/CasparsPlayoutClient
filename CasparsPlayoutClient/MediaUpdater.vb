@@ -166,7 +166,7 @@ Public Class InfoMediaUpdater
     ''' Updates all playing media items in the playlist
     ''' </summary>
     ''' <remarks></remarks>
-    Public Sub updateMedia(ByVal sender As Object, e As frameTickEventArgs)
+    Public Sub updateMedia()
         ''
         '' reads in alle channels as xml
         '' and checks the state of each layer
